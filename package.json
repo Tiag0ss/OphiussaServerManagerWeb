@@ -1,27 +1,59 @@
 {
-  "name": "ophiussa-scaffold",
+  "name": "ophiussa-server-manager",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
-    "start": "next start",
-    "lint": "eslint"
+    "dev:clean": "pkill -f 'next dev' 2>/dev/null || true; next dev --turbopack",
+    "containers": "bash scripts/list-devcontainers.sh",
+    "build": "next build && node scripts/prepare-standalone.mjs",
+    "start": "HOSTNAME=0.0.0.0 node .next/standalone/server.js",
+    "start:next": "next start",
+    "lint": "eslint .",
+    "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "basic-ftp": "^6.2.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "dockerode": "^5.0.1",
+    "drizzle-orm": "^0.45.2",
+    "ftp-srv": "^4.6.3",
+    "jose": "^6.2.9",
+    "lucide-react": "^1.31.0",
+    "nanoid": "^6.0.1",
+    "next": "15.5.23",
+    "node-cron": "^4.6.0",
+    "rcon-client": "^4.2.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "next": "15.5.23"
+    "ssh2": "^1.17.0",
+    "tailwind-merge": "^3.6.0",
+    "tar": "^7.5.22",
+    "uuid": "^14.0.1",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/dockerode": "^4.0.1",
     "@types/node": "^20",
+    "@types/node-cron": "^3.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4",
+    "@types/ssh2": "^1.15.5",
+    "@types/tar": "^6.1.13",
+    "@types/uuid": "^10.0.0",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "15.5.23",
-    "@eslint/eslintrc": "^3"
+    "tailwindcss": "^4",
+    "typescript": "^5"
   }
 }

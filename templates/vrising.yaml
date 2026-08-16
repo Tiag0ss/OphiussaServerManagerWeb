@@ -1,0 +1,217 @@
+id: vrising
+name: V Rising
+description: V Rising dedicated server — world name, PvP/PvE, clan size and host settings
+runtime:
+  image: trueosiris/vrising
+  stopTimeout: 60
+  memoryMb: 6144
+  cpuLimit: 2
+  ports:
+    - { key: game, container: 9876, protocol: udp }
+    - { key: query, container: 9877, protocol: udp }
+    - { key: rcon, container: 25575, protocol: tcp }
+  volumes:
+    - { key: data, container: /vrising/server-data }
+  files:
+    - path: Settings/ServerHostSettings.json
+      format: json
+    - path: Settings/ServerGameSettings.json
+      format: json
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - Settings
+      - Saves
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: rconPassword
+  saveCommand: save
+mods:
+  providers: [thunderstore]
+  thunderstoreNamespace: v-rising
+  installPath: BepInEx/plugins
+options:
+  gameMode:
+    - { value: PvE, label: PvE }
+    - { value: PvP, label: PvP }
+  castleHeartDamage:
+    - { value: Always, label: Always }
+    - { value: Never, label: Never }
+    - { value: TimeRestricted, label: Time restricted }
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: My V Rising Server
+    bind: { env: SERVERNAME, json: Name }
+  - key: worldName
+    type: string
+    group: World
+    label: World / save name
+    required: true
+    default: world1
+    description: Save folder name under persistent data
+    bind: { env: WORLDNAME }
+  - key: password
+    type: string
+    group: Server
+    label: Password
+    secret: true
+    default: ""
+    bind: { env: SERVERPASSWORD, json: Password }
+  - key: maxUsers
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 40
+    default: 10
+    bind: { env: MAXUSERS, json: MaxConnectedUsers }
+  - key: listOnSteam
+    type: boolean
+    group: Server
+    label: List on Steam
+    default: true
+    bind: { env: HOST_SETTINGS_ListOnSteam, trueFalse: true }
+  - key: listOnEOS
+    type: boolean
+    group: Server
+    label: List on EOS / crossplay browser
+    default: true
+    bind: { env: HOST_SETTINGS_ListOnEOS, trueFalse: true }
+  - key: useRcon
+    type: boolean
+    group: Server
+    label: Enable RCON
+    default: true
+    bind: { json: Rcon.Enabled }
+  - key: rconPassword
+    type: string
+    group: Server
+    label: RCON password
+    secret: true
+    default: changeme
+    showIf: { field: useRcon, equals: true }
+    bind: { env: RCONPASSWORD, json: Rcon.Password }
+  - key: gameMode
+    type: select
+    group: Rules
+    label: Game mode
+    optionsFrom: gameMode
+    default: PvE
+    bind: { env: GAME_SETTINGS_GameModeType }
+  - key: clanSize
+    type: number
+    group: Rules
+    label: Clan size
+    min: 1
+    max: 10
+    default: 4
+    bind: { env: GAME_SETTINGS_ClanSize }
+  - key: dayDuration
+    type: slider
+    group: World
+    label: Day duration (seconds)
+    min: 300
+    max: 3600
+    step: 60
+    default: 1080
+    bind: { env: GAME_SETTINGS_DayDurationInSeconds }
+  - key: bloodBoundAmount
+    type: slider
+    group: World
+    label: Blood-bound amount
+    min: 0
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_BloodBoundAmount }
+  - key: castleHeartDamageMode
+    type: select
+    group: Rules
+    label: Castle heart damage
+    optionsFrom: castleHeartDamage
+    default: Always
+    advanced: true
+    bind: { env: GAME_SETTINGS_CastleHeartDamageMode }
+  - key: teleportBoundItems
+    type: boolean
+    group: Rules
+    label: Allow teleport with bound items
+    default: false
+    advanced: true
+    bind: { env: GAME_SETTINGS_TeleportBoundItems, trueFalse: true }
+  - key: inventoryStacksModifier
+    type: slider
+    group: Rates
+    label: Inventory stack size
+    min: 1
+    max: 5
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_InventoryStacksModifier }
+  - key: dropTableModifier
+    type: slider
+    group: Rates
+    label: Drop table modifier
+    min: 0.5
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_DropTableModifier_General }
+  - key: materialYieldModifier
+    type: slider
+    group: Rates
+    label: Material yield
+    min: 0.5
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_MaterialYieldModifier }
+  - key: bloodEssenceYield
+    type: slider
+    group: Rates
+    label: Blood essence yield
+    min: 0.5
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_BloodEssenceYieldModifier }
+  - key: sunDamageModifier
+    type: slider
+    group: Rates
+    label: Sun damage
+    min: 0
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_SunDamageModifier }
+  - key: durabilityLoss
+    type: slider
+    group: Rates
+    label: Durability loss
+    min: 0
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_DurabilityModifier }
+  - key: logDays
+    type: number
+    group: Maintenance
+    label: Keep log files (days)
+    min: 1
+    max: 90
+    default: 30
+    advanced: true
+    bind: { env: LOGDAYS }

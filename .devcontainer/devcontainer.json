@@ -1,0 +1,40 @@
+{
+  "name": "Ophiussa Server Manager",
+  "dockerFile": "../Dockerfile",
+  "context": "..",
+  "build": {
+    "target": "development"
+  },
+  "workspaceFolder": "/app",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind,consistency=cached",
+  "forwardPorts": [3000, 2121, 2022],
+  "portsAttributes": {
+    "3000": { "label": "Panel" },
+    "2121": { "label": "FTP (dev)" },
+    "2022": { "label": "SFTP" }
+  },
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind",
+    "source=${localWorkspaceFolder}/data,target=/data,type=bind",
+    "source=ophiussa-node-modules,target=/app/node_modules,type=volume",
+    "source=ophiussa-next-cache,target=/app/.next,type=volume"
+  ],
+  "containerEnv": {
+    "DATA_DIR": "/data",
+    "HOST_DATA_DIR": "${localWorkspaceFolder}/data",
+    "NODE_ENV": "development",
+    "OPHIUSSA_DIST_DIR": "/tmp/ophiussa-next"
+  },
+  "postCreateCommand": "bash -lc 'set -e; ls -la package.json package-lock.json; if [ -f package-lock.json ]; then npm ci; else npm install; fi; mkdir -p /data/servers /data/backups /data/logs /tmp/ophiussa-next'",
+  "postStartCommand": "bash -lc 'test -d node_modules/next || npm ci || npm install; mkdir -p /data/servers /data/backups /data/logs /tmp/ophiussa-next'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode"
+      ]
+    }
+  },
+  "remoteUser": "root"
+}

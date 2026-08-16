@@ -1,0 +1,345 @@
+id: palworld
+name: Palworld
+description: Palworld dedicated server with rates, PvP, randomizer seed and backups
+runtime:
+  image: thijsvanloef/palworld-server-docker
+  stopTimeout: 60
+  memoryMb: 8192
+  cpuLimit: 2
+  ports:
+    - { key: game, container: 8211, protocol: udp }
+    - { key: query, container: 27015, protocol: udp }
+    - { key: rcon, container: 25575, protocol: tcp }
+  volumes:
+    - { key: data, container: /palworld }
+  env:
+    EULA: "true"
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - Pal/Saved
+    exclude:
+      - steamapps
+      - steamcmd
+      - Pal/Binaries
+      - Engine
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: adminPassword
+  saveCommand: Save
+mods:
+  providers: [steam-workshop]
+  workshopAppId: 1623730
+  installPath: Mods
+options:
+  difficulty:
+    - { value: None, label: None }
+    - { value: Normal, label: Normal }
+    - { value: Difficult, label: Difficult }
+  deathPenalty:
+    - { value: None, label: None }
+    - { value: Item, label: Item }
+    - { value: ItemAndEquipment, label: Item and equipment }
+    - { value: All, label: All }
+  randomizer:
+    - { value: None, label: None }
+    - { value: Region, label: Region }
+    - { value: All, label: Fully random }
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: My Palworld Server
+    bind: { env: SERVER_NAME }
+  - key: serverDescription
+    type: string
+    group: Server
+    label: Description
+    default: ""
+    bind: { env: SERVER_DESCRIPTION }
+  - key: serverPassword
+    type: string
+    group: Server
+    label: Password
+    secret: true
+    default: ""
+    bind: { env: SERVER_PASSWORD }
+  - key: adminPassword
+    type: string
+    group: Server
+    label: Admin / RCON password
+    secret: true
+    required: true
+    default: changeme
+    bind: { env: ADMIN_PASSWORD }
+  - key: players
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 32
+    default: 16
+    bind: { env: PLAYERS }
+  - key: community
+    type: boolean
+    group: Server
+    label: Community server
+    default: false
+    bind: { env: COMMUNITY, trueFalse: true }
+  - key: rconEnabled
+    type: boolean
+    group: Server
+    label: Enable RCON
+    default: true
+    bind: { env: RCON_ENABLED, trueFalse: true }
+  - key: difficulty
+    type: select
+    group: World
+    label: Difficulty
+    optionsFrom: difficulty
+    default: None
+    bind: { env: DIFFICULTY }
+  - key: randomizerType
+    type: select
+    group: World
+    label: Randomizer
+    optionsFrom: randomizer
+    default: None
+    bind: { env: RANDOMIZER_TYPE }
+  - key: randomizerSeed
+    type: string
+    group: World
+    label: Randomizer seed
+    placeholder: Leave empty for random
+    description: Used when Randomizer is Region or All
+    default: ""
+    showIf: { field: randomizerType, notEquals: None }
+    bind: { env: RANDOMIZER_SEED }
+  - key: randomizerPalLevel
+    type: boolean
+    group: World
+    label: Fully random wild Pal levels
+    default: false
+    advanced: true
+    showIf: { field: randomizerType, notEquals: None }
+    bind: { env: IS_RANDOMIZER_PAL_LEVEL_RANDOM, trueFalse: true }
+  - key: deathPenalty
+    type: select
+    group: Rules
+    label: Death penalty
+    optionsFrom: deathPenalty
+    default: Item
+    bind: { env: DEATH_PENALTY }
+  - key: isPvp
+    type: boolean
+    group: Rules
+    label: PvP
+    default: false
+    bind: { env: IS_PVP, trueFalse: true }
+  - key: enablePlayerToPlayerDamage
+    type: boolean
+    group: Rules
+    label: Player vs player damage
+    default: false
+    advanced: true
+    bind: { env: ENABLE_PLAYER_TO_PLAYER_DAMAGE, trueFalse: true }
+  - key: enableFriendlyFire
+    type: boolean
+    group: Rules
+    label: Friendly fire
+    default: false
+    advanced: true
+    bind: { env: ENABLE_FRIENDLY_FIRE, trueFalse: true }
+  - key: enableInvaderEnemy
+    type: boolean
+    group: Rules
+    label: Base raids / invaders
+    default: true
+    bind: { env: ENABLE_INVADER_ENEMY, trueFalse: true }
+  - key: expRate
+    type: slider
+    group: Rates
+    label: EXP rate
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    bind: { env: EXP_RATE }
+  - key: palSpawnRate
+    type: slider
+    group: Rates
+    label: Pal spawn rate
+    min: 0.5
+    max: 3
+    step: 0.1
+    default: 1
+    bind: { env: PAL_SPAWN_NUM_RATE }
+  - key: palCaptureRate
+    type: slider
+    group: Rates
+    label: Pal capture rate
+    min: 0.5
+    max: 3
+    step: 0.1
+    default: 1
+    bind: { env: PAL_CAPTURE_RATE }
+  - key: collectionDropRate
+    type: slider
+    group: Rates
+    label: Collection drop rate
+    min: 0.5
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: COLLECTION_DROP_RATE }
+  - key: enemyDropItemRate
+    type: slider
+    group: Rates
+    label: Enemy drop rate
+    min: 0.5
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: ENEMY_DROP_ITEM_RATE }
+  - key: daytimeSpeed
+    type: slider
+    group: Rates
+    label: Daytime speed
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: DAYTIME_SPEEDRATE }
+  - key: nighttimeSpeed
+    type: slider
+    group: Rates
+    label: Nighttime speed
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: NIGHTTIME_SPEEDRATE }
+  - key: palDamageAttack
+    type: slider
+    group: Combat
+    label: Pal attack damage
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PAL_DAMAGE_RATE_ATTACK }
+  - key: palDamageDefense
+    type: slider
+    group: Combat
+    label: Pal damage taken
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PAL_DAMAGE_RATE_DEFENSE }
+  - key: playerDamageAttack
+    type: slider
+    group: Combat
+    label: Player attack damage
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PLAYER_DAMAGE_RATE_ATTACK }
+  - key: playerDamageDefense
+    type: slider
+    group: Combat
+    label: Player damage taken
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PLAYER_DAMAGE_RATE_DEFENSE }
+  - key: playerStomach
+    type: slider
+    group: Survival
+    label: Player hunger drain
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PLAYER_STOMACH_DECREASE_RATE }
+  - key: playerStamina
+    type: slider
+    group: Survival
+    label: Player stamina drain
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PLAYER_STAMINA_DECREASE_RATE }
+  - key: guildPlayerMax
+    type: number
+    group: Server
+    label: Max players per guild
+    min: 1
+    max: 100
+    default: 20
+    advanced: true
+    bind: { env: GUILD_PLAYER_MAX_NUM }
+  - key: baseCampWorkerMax
+    type: number
+    group: Server
+    label: Max base camp workers
+    min: 1
+    max: 50
+    default: 15
+    advanced: true
+    bind: { env: BASE_CAMP_WORKER_MAX_NUM }
+  - key: backupEnabled
+    type: boolean
+    group: Maintenance
+    label: Automatic backups
+    default: true
+    bind: { env: BACKUP_ENABLED, trueFalse: true }
+  - key: backupCron
+    type: string
+    group: Maintenance
+    label: Backup cron
+    default: "0 */2 * * *"
+    advanced: true
+    showIf: { field: backupEnabled, equals: true }
+    bind: { env: BACKUP_CRON_EXPRESSION }
+  - key: deleteOldBackups
+    type: boolean
+    group: Maintenance
+    label: Delete old backups
+    default: true
+    advanced: true
+    showIf: { field: backupEnabled, equals: true }
+    bind: { env: DELETE_OLD_BACKUPS, trueFalse: true }
+  - key: oldBackupDays
+    type: number
+    group: Maintenance
+    label: Keep backups (days)
+    min: 1
+    max: 90
+    default: 7
+    advanced: true
+    showIf: { field: deleteOldBackups, equals: true }
+    bind: { env: OLD_BACKUP_DAYS }
+  - key: discordWebhook
+    type: string
+    group: Hooks
+    label: Discord webhook URL
+    advanced: true
+    default: ""
+    bind: { env: DISCORD_WEBHOOK_URL }

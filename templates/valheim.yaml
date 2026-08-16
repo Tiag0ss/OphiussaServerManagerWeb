@@ -1,0 +1,346 @@
+id: valheim
+name: Valheim
+description: Valheim dedicated server (lloesche) — seed, modifiers, BepInEx / ValheimPlus, backups
+runtime:
+  image: ghcr.io/lloesche/valheim-server
+  stopTimeout: 90
+  memoryMb: 4096
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 2456, protocol: udp }
+    - { key: game2, container: 2457, protocol: udp }
+    - { key: game3, container: 2458, protocol: udp }
+  volumes:
+    - { key: data, container: /config }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    # Only worlds + access lists + mod configs — never the game image layers
+    include:
+      - worlds
+      - worlds_local
+      - adminlist.txt
+      - bannedlist.txt
+      - permittedlist.txt
+      - prefs
+      - bepinex
+      - valheimplus
+    exclude:
+      - backups
+      - .config
+      - .local
+mods:
+  providers: [thunderstore, steam-workshop]
+  thunderstoreNamespace: valheim
+  workshopAppId: 892970
+  installPath: bepinex/plugins
+options:
+  presets:
+    - { value: "", label: None (custom modifiers) }
+    - { value: normal, label: Normal }
+    - { value: casual, label: Casual }
+    - { value: easy, label: Easy }
+    - { value: hard, label: Hard }
+    - { value: hardcore, label: Hardcore }
+    - { value: immersive, label: Immersive }
+    - { value: hammer, label: Hammer }
+  combat:
+    - { value: "", label: Default }
+    - { value: veryeasy, label: Very easy }
+    - { value: easy, label: Easy }
+    - { value: hard, label: Hard }
+    - { value: veryhard, label: Very hard }
+  deathPenalty:
+    - { value: "", label: Default }
+    - { value: casual, label: Casual }
+    - { value: veryeasy, label: Very easy }
+    - { value: easy, label: Easy }
+    - { value: hard, label: Hard }
+    - { value: hardcore, label: Hardcore }
+  resources:
+    - { value: "", label: Default }
+    - { value: muchless, label: Much less }
+    - { value: less, label: Less }
+    - { value: more, label: More }
+    - { value: muchmore, label: Much more }
+    - { value: most, label: Most }
+  raids:
+    - { value: "", label: Default }
+    - { value: none, label: None }
+    - { value: muchless, label: Much less }
+    - { value: less, label: Less }
+    - { value: more, label: More }
+    - { value: muchmore, label: Much more }
+  portals:
+    - { value: "", label: Default }
+    - { value: casual, label: Casual }
+    - { value: hard, label: Hard }
+    - { value: veryhard, label: Very hard }
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: My Valheim Server
+    bind: { env: SERVER_NAME }
+  - key: worldName
+    type: string
+    group: Server
+    label: World name
+    required: true
+    default: Dedicated
+    description: Filename for the world (no spaces). Changing this creates a new world.
+    bind: { env: WORLD_NAME }
+  - key: worldSeed
+    type: string
+    group: World
+    label: World seed
+    placeholder: Leave empty for random
+    description: Only used when the world is first created. Ignored if world files already exist.
+    default: ""
+    bind: { env: SERVER_ARGS, prefix: "-worldseed " }
+  - key: serverPass
+    type: string
+    group: Server
+    label: Password
+    secret: true
+    required: true
+    default: changeme
+    description: Minimum 5 characters (Steam requirement for public listing)
+    bind: { env: SERVER_PASS }
+  - key: public
+    type: boolean
+    group: Server
+    label: List on community server browser
+    default: false
+    bind: { env: SERVER_PUBLIC, trueFalse: true }
+  - key: crossplay
+    type: boolean
+    group: Server
+    label: Crossplay (Xbox / Microsoft Store)
+    default: false
+    bind: { env: CROSSPLAY, trueFalse: true }
+  - key: timezone
+    type: string
+    group: Server
+    label: Timezone
+    default: Europe/Lisbon
+    advanced: true
+    bind: { env: TZ }
+  - key: updateCron
+    type: string
+    group: Maintenance
+    label: Update check cron
+    default: "*/15 * * * *"
+    description: Empty string disables auto-updates
+    advanced: true
+    bind: { env: UPDATE_CRON }
+  - key: updateIfIdle
+    type: boolean
+    group: Maintenance
+    label: Only update when idle
+    default: true
+    advanced: true
+    bind: { env: UPDATE_IF_IDLE, trueFalse: true }
+  - key: restartCron
+    type: string
+    group: Maintenance
+    label: Daily restart cron
+    default: "10 5 * * *"
+    description: Empty string disables scheduled restarts
+    advanced: true
+    bind: { env: RESTART_CRON }
+  - key: restartIfIdle
+    type: boolean
+    group: Maintenance
+    label: Only restart when idle
+    default: true
+    advanced: true
+    bind: { env: RESTART_IF_IDLE, trueFalse: true }
+  - key: backups
+    type: boolean
+    group: Maintenance
+    label: Automatic world backups
+    default: true
+    bind: { env: BACKUPS, trueFalse: true }
+  - key: backupsCron
+    type: string
+    group: Maintenance
+    label: Backup cron
+    default: "5 * * * *"
+    advanced: true
+    showIf: { field: backups, equals: true }
+    bind: { env: BACKUPS_CRON }
+  - key: backupsMaxAge
+    type: number
+    group: Maintenance
+    label: Backup max age (days)
+    min: 1
+    max: 90
+    default: 3
+    advanced: true
+    showIf: { field: backups, equals: true }
+    bind: { env: BACKUPS_MAX_AGE }
+  - key: backupsMaxCount
+    type: number
+    group: Maintenance
+    label: Max backups to keep (0 = unlimited)
+    min: 0
+    max: 200
+    default: 0
+    advanced: true
+    showIf: { field: backups, equals: true }
+    bind: { env: BACKUPS_MAX_COUNT }
+  - key: backupsIfIdle
+    type: boolean
+    group: Maintenance
+    label: Backup even when idle
+    default: true
+    advanced: true
+    showIf: { field: backups, equals: true }
+    bind: { env: BACKUPS_IF_IDLE, trueFalse: true }
+  - key: preset
+    type: select
+    group: World
+    label: World preset
+    optionsFrom: presets
+    default: normal
+    description: Built-in difficulty preset. Override individual modifiers below if needed.
+    bind: { env: SERVER_ARGS, prefix: "-preset " }
+  - key: combat
+    type: select
+    group: World
+    label: Combat difficulty
+    optionsFrom: combat
+    default: ""
+    bind: { env: SERVER_ARGS, prefix: "-modifier combat " }
+  - key: deathPenalty
+    type: select
+    group: World
+    label: Death penalty
+    optionsFrom: deathPenalty
+    default: ""
+    bind: { env: SERVER_ARGS, prefix: "-modifier deathpenalty " }
+  - key: resources
+    type: select
+    group: World
+    label: Resource availability
+    optionsFrom: resources
+    default: ""
+    bind: { env: SERVER_ARGS, prefix: "-modifier resources " }
+  - key: raids
+    type: select
+    group: World
+    label: Raid frequency
+    optionsFrom: raids
+    default: ""
+    bind: { env: SERVER_ARGS, prefix: "-modifier raids " }
+  - key: portals
+    type: select
+    group: World
+    label: Portal restrictions
+    optionsFrom: portals
+    default: ""
+    bind: { env: SERVER_ARGS, prefix: "-modifier portals " }
+  - key: noMap
+    type: boolean
+    group: Keys
+    label: Disable map (-setkey nomap)
+    default: false
+    bind: { env: SERVER_ARGS, ifTrue: "-setkey nomap" }
+  - key: playerEvents
+    type: boolean
+    group: Keys
+    label: Player-based raids (-setkey playerevents)
+    default: false
+    bind: { env: SERVER_ARGS, ifTrue: "-setkey playerevents" }
+  - key: passiveMobs
+    type: boolean
+    group: Keys
+    label: Passive mobs (-setkey passivemobs)
+    default: false
+    advanced: true
+    bind: { env: SERVER_ARGS, ifTrue: "-setkey passivemobs" }
+  - key: noBuildCost
+    type: boolean
+    group: Keys
+    label: No build cost (-setkey nobuildcost)
+    default: false
+    advanced: true
+    bind: { env: SERVER_ARGS, ifTrue: "-setkey nobuildcost" }
+  - key: noCraftCost
+    type: boolean
+    group: Keys
+    label: No craft / upgrade cost (-setkey nocraftcost)
+    default: false
+    advanced: true
+    bind: { env: SERVER_ARGS, ifTrue: "-setkey nocraftcost" }
+  - key: noMapPortals
+    type: boolean
+    group: Keys
+    label: All portals unlocked (-setkey nobossportals)
+    default: false
+    advanced: true
+    bind: { env: SERVER_ARGS, ifTrue: "-setkey nobossportals" }
+  - key: bepinex
+    type: boolean
+    group: Mods
+    label: Enable BepInEx
+    default: true
+    description: Required for most Thunderstore mods. Cannot be used with ValheimPlus.
+    bind: { env: BEPINEX, trueFalse: true }
+  - key: valheimPlus
+    type: boolean
+    group: Mods
+    label: Enable ValheimPlus
+    default: false
+    description: Alternative to BepInEx — do not enable both.
+    showIf: { field: bepinex, equals: false }
+    bind: { env: VALHEIM_PLUS, trueFalse: true }
+  - key: publicTest
+    type: boolean
+    group: Mods
+    label: Public test beta branch
+    default: false
+    advanced: true
+    bind: { env: PUBLIC_TEST, trueFalse: true }
+  - key: adminList
+    type: list
+    group: Access
+    label: Admin Steam IDs
+    item: { type: string, placeholder: "7656119…" }
+    default: []
+    bind: { env: ADMINLIST_IDS, join: " " }
+  - key: bannedList
+    type: list
+    group: Access
+    label: Banned Steam IDs
+    advanced: true
+    item: { type: string, placeholder: "7656119…" }
+    default: []
+    bind: { env: BANNEDLIST_IDS, join: " " }
+  - key: permittedList
+    type: list
+    group: Access
+    label: Whitelist Steam IDs (empty = open)
+    advanced: true
+    item: { type: string, placeholder: "7656119…" }
+    default: []
+    bind: { env: PERMITTEDLIST_IDS, join: " " }
+  - key: discordWebhook
+    type: string
+    group: Hooks
+    label: Discord webhook URL
+    advanced: true
+    default: ""
+    bind: { env: DISCORD_WEBHOOK }
+  - key: additionalArgs
+    type: text
+    group: Server
+    label: Extra SERVER_ARGS
+    advanced: true
+    default: ""
+    description: Appended to generated -worldseed / -preset / -modifier flags
+    bind: { env: SERVER_ARGS }

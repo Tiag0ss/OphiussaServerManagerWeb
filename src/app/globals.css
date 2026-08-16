@@ -1,26 +1,62 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0f14;
+  --foreground: #e8eef6;
+  --card: #121821;
+  --card-elevated: #171e29;
+  --muted: #8b9bb0;
+  --border: #243041;
+  --accent: #3d9cfd;
+  --accent-fg: #061018;
+  --accent-soft: rgba(61, 156, 253, 0.14);
+  --danger: #f07178;
+  --ok: #7fd99a;
+  --warn: #e6c07b;
+  --sidebar: #0e131a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-card: var(--card);
+  --color-card-elevated: var(--card-elevated);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-sidebar: var(--sidebar);
+  --font-sans: "IBM Plex Sans", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(900px 480px at 0% -10%, rgba(61, 156, 253, 0.12), transparent 55%),
+    radial-gradient(700px 400px at 100% 0%, rgba(127, 217, 154, 0.06), transparent 50%),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
 }

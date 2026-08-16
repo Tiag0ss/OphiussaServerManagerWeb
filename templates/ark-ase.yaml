@@ -1,0 +1,388 @@
+id: ark-ase
+name: ARK Survival Evolved
+description: ARK ASE dedicated server — complex rates, maps, mods and dino overrides
+runtime:
+  image: ich777/steamcmd:arkse
+  stopTimeout: 120
+  memoryMb: 8192
+  cpuLimit: 3
+  ports:
+    - { key: game, container: 7777, protocol: udp }
+    - { key: gameRaw, container: 7778, protocol: udp }
+    - { key: query, container: 27015, protocol: udp }
+    - { key: rcon, container: 27020, protocol: tcp }
+  volumes:
+    - { key: data, container: /serverdata/serverfiles }
+  files:
+    - path: ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini
+      format: ini
+  backup:
+    include:
+      - ShooterGame/Saved
+    exclude:
+      - steamapps
+      - Engine
+      - ShooterGame/Binaries
+      - ShooterGame/Content
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: serverAdminPassword
+  saveCommand: saveworld
+mods:
+  providers: [steam-workshop, curseforge]
+  workshopAppId: 346110
+  curseforgeGameId: 348
+  installPath: ShooterGame/Content/Mods
+  bind: { env: GAME_ID_PARAMS, join: "," }
+options:
+  maps:
+    - { value: TheIsland, label: The Island }
+    - { value: TheCenter, label: The Center }
+    - { value: ScorchedEarth_P, label: Scorched Earth }
+    - { value: Ragnarok, label: Ragnarok }
+    - { value: Aberration_P, label: Aberration }
+    - { value: Extinction, label: Extinction }
+    - { value: Valguero_P, label: Valguero }
+    - { value: Genesis, label: Genesis }
+    - { value: CrystalIsles, label: Crystal Isles }
+    - { value: Gen2, label: Genesis Part 2 }
+    - { value: LostIsland, label: Lost Island }
+    - { value: Fjordur, label: Fjordur }
+  dinos:
+    - { value: Rex_Character_BP_C, label: Rex }
+    - { value: Argent_Character_BP_C, label: Argentavis }
+    - { value: Spino_Character_BP_C, label: Spino }
+    - { value: Giga_Character_BP_C, label: Giganotosaurus }
+    - { value: Quetz_Character_BP_C, label: Quetzal }
+fields:
+  - key: sessionName
+    type: string
+    group: Server
+    label: Session name
+    required: true
+    default: My ARK Server
+    bind: { env: SESSION_NAME, ini: "SessionSettings.SessionName" }
+  - key: map
+    type: select
+    group: Server
+    label: Map
+    optionsFrom: maps
+    default: TheIsland
+    required: true
+    bind: { env: MAP }
+  - key: serverPassword
+    type: string
+    group: Server
+    label: Server password
+    secret: true
+    default: ""
+    bind: { ini: "ServerSettings.ServerPassword" }
+  - key: serverAdminPassword
+    type: string
+    group: Server
+    label: Admin password
+    secret: true
+    required: true
+    default: changeme
+    bind: { ini: "ServerSettings.ServerAdminPassword" }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 100
+    default: 20
+    bind: { env: MAX_PLAYERS, ini: "/Script/Engine.GameSession.MaxPlayers" }
+  - key: difficulty
+    type: slider
+    group: Rules
+    label: Difficulty offset
+    min: 0
+    max: 1
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.DifficultyOffset" }
+  - key: tamingSpeed
+    type: slider
+    group: Rules
+    label: Taming speed
+    min: 1
+    max: 50
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.TamingSpeedMultiplier" }
+  - key: harvestAmount
+    type: slider
+    group: Harvesting
+    label: Harvest amount
+    min: 1
+    max: 20
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.HarvestAmountMultiplier" }
+  - key: xpMultiplier
+    type: slider
+    group: Rules
+    label: XP multiplier
+    min: 1
+    max: 10
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.XPMultiplier" }
+  - key: matingInterval
+    type: slider
+    group: Rules
+    label: Mating interval
+    min: 0.1
+    max: 3
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.MatingIntervalMultiplier" }
+  - key: allowFlyerCarryPvE
+    type: boolean
+    group: Rules
+    label: Allow flyer carry (PvE)
+    default: true
+    advanced: true
+    bind: { ini: "ServerSettings.AllowFlyerCarryPvE" }
+  - key: harvestHealth
+    type: slider
+    group: Harvesting
+    label: Harvest health
+    min: 1
+    max: 10
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.HarvestHealthMultiplier" }
+  - key: resourcesRespawnPeriod
+    type: slider
+    group: Harvesting
+    label: Resource respawn period
+    min: 0.1
+    max: 3
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.ResourcesRespawnPeriodMultiplier" }
+  - key: playerCharacterWaterDrain
+    type: slider
+    group: Player
+    label: Water drain
+    min: 0.1
+    max: 3
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerCharacterWaterDrainMultiplier" }
+  - key: playerCharacterFoodDrain
+    type: slider
+    group: Player
+    label: Food drain
+    min: 0.1
+    max: 3
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerCharacterFoodDrainMultiplier" }
+  - key: playerCharacterStaminaDrain
+    type: slider
+    group: Player
+    label: Stamina drain
+    min: 0.1
+    max: 3
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerCharacterStaminaDrainMultiplier" }
+  - key: playerCharacterHealthRecovery
+    type: slider
+    group: Player
+    label: Health recovery
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerCharacterHealthRecoveryMultiplier" }
+  - key: dinoCharacterFoodDrain
+    type: slider
+    group: Dinos
+    label: Dino food drain
+    min: 0.1
+    max: 3
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.DinoCharacterFoodDrainMultiplier" }
+  - key: dinoCount
+    type: slider
+    group: Dinos
+    label: Dino count
+    min: 0.5
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.DinoCountMultiplier" }
+  - key: eggHatchSpeed
+    type: slider
+    group: Breeding
+    label: Egg hatch speed
+    min: 1
+    max: 100
+    step: 1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.EggHatchSpeedMultiplier" }
+  - key: babyMatureSpeed
+    type: slider
+    group: Breeding
+    label: Baby mature speed
+    min: 1
+    max: 100
+    step: 1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.BabyMatureSpeedMultiplier" }
+  - key: babyCuddleInterval
+    type: slider
+    group: Breeding
+    label: Baby cuddle interval
+    min: 0.01
+    max: 2
+    step: 0.01
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.BabyCuddleIntervalMultiplier" }
+  - key: cropGrowthSpeed
+    type: slider
+    group: Harvesting
+    label: Crop growth speed
+    min: 1
+    max: 50
+    step: 1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.CropGrowthSpeedMultiplier" }
+  - key: nightTimeSpeed
+    type: slider
+    group: Rules
+    label: Night time speed
+    min: 0.5
+    max: 10
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.NightTimeSpeedScale" }
+  - key: dayTimeSpeed
+    type: slider
+    group: Rules
+    label: Day time speed
+    min: 0.5
+    max: 10
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.DayTimeSpeedScale" }
+  - key: pve
+    type: boolean
+    group: Rules
+    label: PvE mode
+    default: true
+    bind: { ini: "ServerSettings.ServerPVE" }
+  - key: allowCaveBuildingPvE
+    type: boolean
+    group: Rules
+    label: Allow cave building (PvE)
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.AllowCaveBuildingPvE" }
+  - key: alwaysAllowStructurePickup
+    type: boolean
+    group: Rules
+    label: Always allow structure pickup
+    default: true
+    advanced: true
+    bind: { ini: "ServerSettings.AlwaysAllowStructurePickup" }
+  - key: structureResistance
+    type: slider
+    group: Rules
+    label: Structure resistance
+    min: 0
+    max: 1
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.StructureResistanceMultiplier" }
+  - key: raidDinoAvailability
+    type: slider
+    group: Dinos
+    label: Raid dino availability
+    min: 0
+    max: 1
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.RaidDinoCharacterFoodDrainMultiplier" }
+  - key: autoSavePeriod
+    type: number
+    group: Server
+    label: Autosave period (minutes)
+    min: 5
+    max: 60
+    default: 15
+    advanced: true
+    bind: { ini: "ServerSettings.AutoSavePeriodMinutes" }
+  - key: enablePVPGamma
+    type: boolean
+    group: Rules
+    label: Enable gamma in PvP
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.EnablePVPGamma" }
+  - key: allowThirdPerson
+    type: boolean
+    group: Rules
+    label: Allow third person
+    default: true
+    advanced: true
+    bind: { ini: "ServerSettings.AllowThirdPersonPlayer" }
+  - key: showMapPlayerLocation
+    type: boolean
+    group: Rules
+    label: Show player location on map
+    default: true
+    advanced: true
+    bind: { ini: "ServerSettings.ShowMapPlayerLocation" }
+  - key: mods
+    type: list
+    group: Mods
+    label: Workshop mod IDs
+    item: { type: string, placeholder: "Steam Workshop ID" }
+    default: []
+    bind: { env: ARK_MODS, join: "," }
+  - key: dinoSpawnWeight
+    type: list
+    group: Dinos
+    label: Dino spawn weight overrides
+    advanced: true
+    default: []
+    item:
+      type: object
+      fields:
+        - { key: class, type: select, label: Dino, optionsFrom: dinos }
+        - { key: weight, type: slider, label: Weight, min: 0, max: 10, step: 0.1, default: 1 }
+  - key: additionalArgs
+    type: text
+    group: Server
+    label: Additional launch args
+    advanced: true
+    default: ""
+    bind: { env: GAME_PARAMS }

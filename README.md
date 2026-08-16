@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ophiussa Server Manager
 
-## Getting Started
+Game server panel for a single Linux VPS. The panel runs as one Docker image; each game server is a separate container managed through the Docker socket.
 
-First, run the development server:
+## Features
+
+- Dynamic template forms (Valheim, V Rising, Palworld, ARK ASE)
+- Start / stop / restart / kill with graceful RCON save when available
+- File manager, embedded FTP + SFTP per server
+- Mod search/install: Thunderstore, CurseForge, Steam Workshop
+- Backups, schedules, users & permissions
+- Single image deploy (no Compose sidecars)
+
+## Development (Dev Container)
+
+1. Open this folder in Cursor/VS Code
+2. Reopen in Container (uses the `development` stage of the root Dockerfile)
+3. `npm run dev` — panel on port 3000, FTP **2121**, SFTP 2022
+
+Local without Dev Container:
 
 ```bash
+npm ci
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Data is stored in `./data` automatically. FTP uses port **2121** in development (port 21 needs root). In the production image, FTP binds to 21.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Docker socket must be available to create game containers.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Production
 
-## Learn More
+```bash
+docker build -t tiag0ss/ophiussa-server-manager:0.1.0 .
+docker push tiag0ss/ophiussa-server-manager:0.1.0
 
-To learn more about Next.js, take a look at the following resources:
+# on the VPS
+curl -fsSL https://raw.githubusercontent.com/Tiag0ss/OphiussaServerManager/main/install.sh | bash
+# or:
+./install.sh
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`install.sh` pulls the image and runs:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `-p 3000:3000` panel
+- `-p 21:21` FTP
+- `-p 2022:2022` SFTP
+- mounts `/var/run/docker.sock` and `/opt/ophiussa/data`
 
-## Deploy on Vercel
+**Security:** mounting `docker.sock` is equivalent to root on the host. Keep the panel private (firewall / reverse proxy auth).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## First run
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open `http://<vps>:3000/setup`, create the admin account, set public IP and port range.
