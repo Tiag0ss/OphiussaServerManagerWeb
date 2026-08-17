@@ -1,0 +1,84 @@
+id: nightingale
+name: Nightingale
+description: Nightingale dedicated server — game port is TCP+UDP on the same host port
+runtime:
+  image: fireblade004/nightingale-server
+  stopTimeout: 90
+  memoryMb: 8192
+  cpuLimit: 4
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 7777, protocol: udp, listenEnv: SERVERGAMEPORT, matchHost: true }
+    - { key: gameTcp, container: 7777, protocol: tcp, matchHost: true }
+  volumes:
+    - { key: data, container: /config }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - gamefiles/NWX/Saved
+    exclude:
+      - gamefiles/Engine
+      - gamefiles/NWX/Binaries
+      - gamefiles/NWX/Content
+      - steamapps
+options:
+  difficulty:
+    - { value: easy, label: Easy }
+    - { value: medium, label: Medium }
+    - { value: hard, label: Hard }
+    - { value: extreme, label: Extreme }
+fields:
+  - key: connectionPassword
+    type: string
+    group: Access
+    label: Join password
+    secret: true
+    default: changeme
+    description: Recommended so the realm is not open to everyone
+    bind: { env: CONNECTIONPASSWORD }
+  - key: adminPassword
+    type: string
+    group: Access
+    label: Admin password
+    secret: true
+    default: changeme
+    bind: { env: ADMINPASSWORD }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 16
+    default: 4
+    bind: { env: MAXPLAYERS }
+  - key: startingDifficulty
+    type: select
+    group: World
+    label: Starting difficulty
+    optionsFrom: difficulty
+    default: easy
+    bind: { env: STARTINGDIFFICULTY }
+  - key: enableCheats
+    type: boolean
+    group: World
+    label: Enable cheats
+    default: false
+    advanced: true
+    bind: { env: ENABLECHEATS, trueFalse: true }
+  - key: skipUpdate
+    type: boolean
+    group: Maintenance
+    label: Skip update on start
+    default: false
+    advanced: true
+    bind: { env: SKIPUPDATE, trueFalse: true }
+  - key: timeout
+    type: number
+    group: Server
+    label: Client timeout (seconds)
+    min: 10
+    max: 120
+    default: 30
+    advanced: true
+    bind: { env: TIMEOUT }

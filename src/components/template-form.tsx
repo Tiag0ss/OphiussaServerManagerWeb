@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { GameTemplate, TemplateField } from "@/lib/templates/types";
 import { evaluateShowIf } from "@/lib/templates/show-if";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
@@ -35,6 +35,13 @@ export function TemplateForm({
   }, [template, mode]);
 
   const [activeGroup, setActiveGroup] = useState(groups[0]?.[0] || "General");
+
+  useEffect(() => {
+    const first = groups[0]?.[0] || "General";
+    setActiveGroup((cur) =>
+      groups.some(([g]) => g === cur) ? cur : first,
+    );
+  }, [groups]);
 
   function setField(key: string, v: unknown) {
     onChange({ ...value, [key]: v });

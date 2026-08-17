@@ -1,0 +1,91 @@
+id: ark-asa
+name: ARK Survival Ascended
+description: ARK ASA dedicated server (Proton) — maps, CurseForge mods, RCON
+runtime:
+  image: sknnr/ark-ascended-server
+  stopTimeout: 120
+  memoryMb: 12288
+  cpuLimit: 4
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 7777, protocol: udp, listenEnv: GAME_PORT, matchHost: true }
+    - { key: rcon, container: 27020, protocol: tcp, listenEnv: RCON_PORT, matchHost: true }
+  volumes:
+    - { key: data, container: /home/steam/ark/ShooterGame/Saved }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - SavedArks
+      - Config
+      - Logs
+    exclude:
+      - steamapps
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: serverAdminPassword
+  saveCommand: saveworld
+mods:
+  providers: [curseforge]
+  curseforgeGameId: 83374
+  installPath: Mods
+  bind: { env: MODS, join: "," }
+options:
+  maps:
+    - { value: TheIsland_WP, label: The Island }
+    - { value: ScorchedEarth_WP, label: Scorched Earth }
+    - { value: TheCenter_WP, label: The Center }
+    - { value: Aberration_WP, label: Aberration }
+    - { value: Extinction_WP, label: Extinction }
+    - { value: Ragnarok_WP, label: Ragnarok }
+    - { value: Astraeos_WP, label: Astraeos }
+    - { value: Valguero_WP, label: Valguero }
+    - { value: LostColony_WP, label: Lost Colony }
+fields:
+  - key: sessionName
+    type: string
+    group: Server
+    label: Session name
+    required: true
+    default: ARK Ascended Server
+    bind: { env: SESSION_NAME }
+  - key: map
+    type: select
+    group: Server
+    label: Map
+    optionsFrom: maps
+    default: TheIsland_WP
+    required: true
+    bind: { env: SERVER_MAP }
+  - key: serverPassword
+    type: string
+    group: Access
+    label: Join password
+    secret: true
+    default: ""
+    bind: { env: SERVER_PASSWORD }
+  - key: serverAdminPassword
+    type: string
+    group: Access
+    label: Admin password
+    secret: true
+    required: true
+    default: changeme
+    bind: { env: SERVER_ADMIN_PASSWORD }
+  - key: extraSettings
+    type: text
+    group: Server
+    label: Extra settings
+    advanced: true
+    default: ""
+    description: "? separated, e.g. ?serverPVE=True?ServerHardcore=True"
+    bind: { env: EXTRA_SETTINGS }
+  - key: extraFlags
+    type: text
+    group: Server
+    label: Extra flags
+    advanced: true
+    default: ""
+    description: "Space-separated, e.g. -NoBattlEye -ForceAllowCaveFlyers"
+    bind: { env: EXTRA_FLAGS }

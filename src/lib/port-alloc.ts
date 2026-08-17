@@ -3,7 +3,7 @@ import { getDb } from "./db";
 import { allocations, users } from "./db/schema";
 import { getSettings } from "./settings";
 import type { SessionUser } from "./auth/session";
-import type { GameTemplate } from "./templates/types";
+import type { GameTemplate, TemplatePort } from "./templates/types";
 
 export type PortRange = { start: number; end: number };
 
@@ -63,8 +63,17 @@ export function findConsecutiveFreePorts(
   return tryFrom(range.start);
 }
 
+function uniqueContainerPorts(ports: TemplatePort[]): number[] {
+  const seen: number[] = [];
+  for (const p of ports) {
+    if (!seen.includes(p.container)) seen.push(p.container);
+  }
+  return seen;
+}
+
 /**
  * Resolve host ports for a template.
+ * TCP+UDP on the same container port share one host port (Satisfactory, Nightingale).
  * `preferred` maps port key → host port; missing keys auto-allocate (preferring a consecutive block).
  */
 export function resolveHostPorts(
@@ -76,9 +85,9 @@ export function resolveHostPorts(
   const ports = tpl.runtime.ports;
   if (!ports.length) return [];
 
-  // Validate preferred ports
+  const hostByContainer = new Map<number, number>();
+
   if (preferred) {
-    const assigned = new Set<number>();
     for (const p of ports) {
       const host = preferred[p.key];
       if (host === undefined) continue;
@@ -87,13 +96,53 @@ export function resolveHostPorts(
           `Port ${host} for "${p.key}" is outside allowed range ${range.start}–${range.end}`,
         );
       }
-      if (used.has(host) || assigned.has(host)) {
+      const existing = hostByContainer.get(p.container);
+      if (existing !== undefined && existing !== host) {
+        throw new Error(
+          `TCP/UDP on container port ${p.container} must share the same host port`,
+        );
+      }
+      hostByContainer.set(p.container, host);
+    }
+
+    const protocolsOnHost = new Map<number, Set<string>>();
+    for (const p of ports) {
+      const host = hostByContainer.get(p.container);
+      if (host === undefined) continue;
+      if (used.has(host)) {
         throw new Error(`Host port ${host} is already in use`);
       }
-      assigned.add(host);
+      const protos = protocolsOnHost.get(host) ?? new Set<string>();
+      if (protos.has(p.protocol)) {
+        throw new Error(`Host port ${host}/${p.protocol} is already in use`);
+      }
+      protos.add(p.protocol);
+      protocolsOnHost.set(host, protos);
     }
   }
 
+  const missingContainers = uniqueContainerPorts(ports).filter(
+    (c) => !hostByContainer.has(c),
+  );
+  if (missingContainers.length > 0) {
+    const blocked = new Set(used);
+    for (const host of hostByContainer.values()) blocked.add(host);
+    const autoBlock = findConsecutiveFreePorts(
+      range,
+      missingContainers.length,
+      blocked,
+    );
+    if (!autoBlock) {
+      throw new Error(
+        `No free ports in range ${range.start}–${range.end} (need ${missingContainers.length} consecutive)`,
+      );
+    }
+    missingContainers.forEach((c, i) => {
+      hostByContainer.set(c, autoBlock[i]!);
+    });
+  }
+
+  const protocolsOnHost = new Map<number, Set<string>>();
   const result: Array<{
     key: string;
     container: number;
@@ -101,28 +150,20 @@ export function resolveHostPorts(
     hostPort: number;
   }> = [];
 
-  const missing = ports.filter((p) => preferred?.[p.key] === undefined);
-  let autoBlock: number[] | null = null;
-  if (missing.length > 0) {
-    autoBlock = findConsecutiveFreePorts(range, missing.length, used);
-    if (!autoBlock) {
-      throw new Error(
-        `No free ports in range ${range.start}–${range.end} (need ${missing.length} consecutive)`,
-      );
-    }
-  }
-
-  let autoIdx = 0;
-  const claimed = new Set(used);
   for (const p of ports) {
-    let hostPort = preferred?.[p.key];
+    const hostPort = hostByContainer.get(p.container);
     if (hostPort === undefined) {
-      hostPort = autoBlock![autoIdx++]!;
+      throw new Error(`Failed to allocate host port for "${p.key}"`);
     }
-    if (claimed.has(hostPort)) {
+    if (used.has(hostPort)) {
       throw new Error(`Host port ${hostPort} is already in use`);
     }
-    claimed.add(hostPort);
+    const protos = protocolsOnHost.get(hostPort) ?? new Set<string>();
+    if (protos.has(p.protocol)) {
+      throw new Error(`Host port ${hostPort}/${p.protocol} is already in use`);
+    }
+    protos.add(p.protocol);
+    protocolsOnHost.set(hostPort, protos);
     result.push({
       key: p.key,
       container: p.container,

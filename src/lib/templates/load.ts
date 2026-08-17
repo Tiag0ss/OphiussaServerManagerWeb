@@ -5,21 +5,17 @@ import { eq } from "drizzle-orm";
 import { getDb } from "../db";
 import { templates } from "../db/schema";
 import { TEMPLATES_DIR } from "../paths";
-import type { GameTemplate, TemplateField } from "./types";
+import type { GameTemplate } from "./types";
 import { evaluateShowIf } from "./show-if";
+import { parseTemplateYaml } from "./definition";
 
 export { evaluateShowIf };
-
-export function parseTemplateYaml(raw: string): GameTemplate {
-  const parsed = YAML.parse(raw) as GameTemplate;
-  if (!parsed?.id || !parsed?.name || !parsed?.runtime?.image) {
-    throw new Error("Invalid template: missing id, name, or runtime.image");
-  }
-  if (!Array.isArray(parsed.fields)) parsed.fields = [];
-  if (!Array.isArray(parsed.runtime.ports)) parsed.runtime.ports = [];
-  if (!Array.isArray(parsed.runtime.volumes)) parsed.runtime.volumes = [];
-  return parsed;
-}
+export {
+  defaultConfigFromTemplate,
+  flattenFields,
+  mergeConfigWithDefaults,
+  parseTemplateYaml,
+} from "./definition";
 
 export function loadTemplatesFromDisk(): GameTemplate[] {
   try {
@@ -125,40 +121,3 @@ export function listTemplates(): GameTemplate[] {
     .map((r) => JSON.parse(r.definitionJson) as GameTemplate);
 }
 
-export function defaultConfigFromTemplate(tpl: GameTemplate): Record<string, unknown> {
-  const config: Record<string, unknown> = {};
-  for (const field of flattenFields(tpl.fields)) {
-    if (field.type === "group") continue;
-    if (field.default !== undefined) {
-      config[field.key] = field.default;
-    } else if (field.type === "boolean") {
-      config[field.key] = false;
-    } else if (field.type === "list") {
-      config[field.key] = [];
-    } else if (field.type === "number" || field.type === "slider" || field.type === "port") {
-      config[field.key] = field.min ?? 0;
-    } else {
-      config[field.key] = "";
-    }
-  }
-  return config;
-}
-
-export function mergeConfigWithDefaults(
-  tpl: GameTemplate,
-  existing: Record<string, unknown>,
-): Record<string, unknown> {
-  const defaults = defaultConfigFromTemplate(tpl);
-  return { ...defaults, ...existing };
-}
-
-export function flattenFields(fields: TemplateField[]): TemplateField[] {
-  const out: TemplateField[] = [];
-  for (const f of fields) {
-    out.push(f);
-    if (f.type === "list" && f.item?.type === "object" && f.item.fields) {
-      // nested fields are not top-level config keys
-    }
-  }
-  return out;
-}

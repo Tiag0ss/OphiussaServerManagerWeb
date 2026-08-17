@@ -7,6 +7,9 @@ import { FilesBrowser } from "@/components/files-browser";
 import { TemplateForm } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
+import { CopyJoinButton } from "@/components/copy-join-button";
+import { joinAddress } from "@/lib/join-address";
+import { syncSharedHostPorts } from "@/lib/port-share";
 import type { GameTemplate } from "@/lib/templates/types";
 
 type QuotaHeadroom = {
@@ -43,6 +46,10 @@ type ServerPayload = {
   } | null;
   quotas: QuotaHeadroom | null;
   portRange?: { start: number; end: number };
+  containerName?: string;
+  ownerName?: string;
+  dockerNetwork?: string;
+  dockerSocket?: string;
   isAdmin?: boolean;
   publicIp: string;
   ftpPort?: number;
@@ -71,11 +78,27 @@ export default function ServerDetailPage() {
   const [portDraft, setPortDraft] = useState<Record<string, number>>({});
   const [resourceBusy, setResourceBusy] = useState(false);
   const [consoleRef, setConsoleRef] = useState<HTMLPreElement | null>(null);
-  const [mods, setMods] = useState<Array<{ id: string; name: string; provider: string }>>([]);
+  const [mods, setMods] = useState<
+    Array<{
+      id: string;
+      name: string;
+      provider: string;
+      version?: string;
+      externalId?: string;
+    }>
+  >([]);
   const [modQuery, setModQuery] = useState("");
   const [modResults, setModResults] = useState<
-    Array<{ id: string; name: string; provider: string; summary?: string }>
+    Array<{
+      id: string;
+      name: string;
+      provider: string;
+      summary?: string;
+      version?: string;
+    }>
   >([]);
+  const [modSearchBusy, setModSearchBusy] = useState(false);
+  const [modInstallBusy, setModInstallBusy] = useState<string | null>(null);
   const [backups, setBackups] = useState<
     Array<{
       id: string;
@@ -247,13 +270,32 @@ export default function ServerDetailPage() {
           </p>
           <h2 className="text-2xl font-semibold">{data.server.name}</h2>
           <p className="text-sm text-muted">
-            {data.template.name} · {data.server.status}
+            {data.template.name}
+            {data.ownerName ? ` · owner ${data.ownerName}` : ""} ·{" "}
+            {data.server.status}
             {data.stats
               ? ` · CPU ${data.stats.cpuPercent}% · RAM ${data.stats.memoryMb} MB`
               : ""}
           </p>
+          {data.containerName && (
+            <p className="font-mono text-xs text-muted">
+              docker: {data.containerName}
+              {data.dockerNetwork ? ` · net ${data.dockerNetwork}` : ""}
+            </p>
+          )}
+          {data.dockerSocket && (
+            <p className="text-xs text-muted" title={data.dockerSocket}>
+              Engine socket: {data.dockerSocket.replace(/^\/home\/[^/]+/, "~")}
+              {data.dockerSocket.includes("desktop")
+                ? " (Docker Desktop)"
+                : " (system Engine — use: docker context use default)"}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <CopyJoinButton
+            address={joinAddress(data.publicIp, data.ports)}
+          />
           <Button size="sm" onClick={() => action("start")}>
             Start
           </Button>
@@ -298,11 +340,11 @@ export default function ServerDetailPage() {
             <div>
               <h3 className="font-medium">Network / ports</h3>
               <p className="text-sm text-muted">
-                Host ports
+                Connect using the host ports below (not the container ports).
                 {data.portRange
-                  ? ` (allowed ${data.portRange.start}–${data.portRange.end})`
-                  : ""}
-                . Changing ports recreates the container.
+                  ? ` Allowed range ${data.portRange.start}–${data.portRange.end}.`
+                  : ""}{" "}
+                Changing ports recreates the container.
               </p>
             </div>
             <ul className="space-y-2 text-sm">
@@ -316,12 +358,17 @@ export default function ServerDetailPage() {
                     className="w-28"
                     type="number"
                     value={portDraft[p.key] ?? p.hostPort}
-                    onChange={(e) =>
-                      setPortDraft((prev) => ({
-                        ...prev,
-                        [p.key]: Number(e.target.value),
-                      }))
-                    }
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setPortDraft((prev) =>
+                        syncSharedHostPorts(
+                          data.template.runtime.ports,
+                          prev,
+                          p.key,
+                          value,
+                        ),
+                      );
+                    }}
                   />
                   <span className="text-xs text-muted">/{p.protocol}</span>
                 </li>
@@ -501,114 +548,277 @@ export default function ServerDetailPage() {
       {tab === "mods" && (
         <div className="space-y-4">
           <Card>
-            <h3 className="font-medium">Mod sources</h3>
-            <p className="mt-1 text-sm text-muted">
+            <h3 className="font-medium">How to install</h3>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-muted">
+              <li>
+                For Valheim Thunderstore mods, enable <strong>BepInEx</strong> in
+                Config (and recreate the container once).
+              </li>
+              <li>
+                Type part of the mod name (e.g. <code>jotunn</code> or{" "}
+                <code>craft</code>) and click Search.
+              </li>
+              <li>
+                Click <strong>Install</strong> on a result — the package is
+                downloaded from Thunderstore and extracted into the server data
+                folder.
+              </li>
+              <li>Restart the server so the game loads the new plugins.</li>
+            </ol>
+            <p className="mt-3 text-sm text-muted">
+              Sources:{" "}
               {(data.template.mods?.providers || []).length
                 ? (data.template.mods?.providers || [])
                     .map((p) =>
                       p === "steam-workshop"
-                        ? "Steam Workshop (install by file ID works without Web API key)"
+                        ? "Steam Workshop (paste numeric file ID)"
                         : p === "thunderstore"
-                          ? "Thunderstore"
-                          : "CurseForge (API key in Settings)",
+                          ? `Thunderstore (${data.template.mods?.thunderstoreNamespace || "community"})`
+                          : "CurseForge",
                     )
                     .join(" · ")
-                : "This template has no mod providers configured"}
+                : "none configured"}
             </p>
           </Card>
           <Card>
-            <h3 className="font-medium">Installed</h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-medium">Installed</h3>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={!!modInstallBusy || mods.length === 0}
+                  onClick={async () => {
+                    setModInstallBusy("all");
+                    setMessage("Reinstalling all mods…");
+                    try {
+                      const res = await fetch(`/api/servers/${id}/mods`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "reinstall-all" }),
+                        signal: AbortSignal.timeout(180_000),
+                      });
+                      const j = await res.json().catch(() => ({}));
+                      if (!res.ok) {
+                        setMessage(j.error || "Reinstall failed");
+                        return;
+                      }
+                      const list = await fetch(`/api/servers/${id}/mods`).then(
+                        (x) => x.json(),
+                      );
+                      setMods(list.mods || []);
+                      setMessage(
+                        "Mods reinstalled. Restart the server to load them.",
+                      );
+                    } catch (e) {
+                      setMessage(
+                        e instanceof Error ? e.message : "Reinstall failed",
+                      );
+                    } finally {
+                      setModInstallBusy(null);
+                    }
+                  }}
+                >
+                  {modInstallBusy === "all" ? "Reinstalling…" : "Reinstall all"}
+                </Button>
+              </div>
+            </div>
             <ul className="mt-3 space-y-2 text-sm">
               {mods.map((m) => (
-                <li key={m.id} className="flex justify-between">
+                <li key={m.id} className="flex justify-between gap-2">
                   <span>
                     {m.name}{" "}
-                    <span className="text-muted">({m.provider})</span>
+                    <span className="text-muted">
+                      ({m.provider}
+                      {m.version ? ` · v${m.version}` : ""})
+                    </span>
                   </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={async () => {
-                      await fetch(`/api/servers/${id}/mods`, {
-                        method: "DELETE",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ modId: m.id }),
-                      });
-                      setMods((prev) => prev.filter((x) => x.id !== m.id));
-                    }}
-                  >
-                    Remove
-                  </Button>
+                  <span className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!!modInstallBusy}
+                      onClick={async () => {
+                        setModInstallBusy(m.id);
+                        setMessage(`Reinstalling ${m.name}…`);
+                        try {
+                          const res = await fetch(`/api/servers/${id}/mods`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              action: "reinstall",
+                              modId: m.id,
+                            }),
+                            signal: AbortSignal.timeout(120_000),
+                          });
+                          const j = await res.json().catch(() => ({}));
+                          if (!res.ok) {
+                            setMessage(j.error || "Reinstall failed");
+                            return;
+                          }
+                          const list = await fetch(
+                            `/api/servers/${id}/mods`,
+                          ).then((x) => x.json());
+                          setMods(list.mods || []);
+                          setMessage(
+                            `Reinstalled ${m.name}. Restart the server to load it.`,
+                          );
+                        } catch (e) {
+                          setMessage(
+                            e instanceof Error ? e.message : "Reinstall failed",
+                          );
+                        } finally {
+                          setModInstallBusy(null);
+                        }
+                      }}
+                    >
+                      {modInstallBusy === m.id ? "…" : "Reinstall"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={!!modInstallBusy}
+                      onClick={async () => {
+                        await fetch(`/api/servers/${id}/mods`, {
+                          method: "DELETE",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ modId: m.id }),
+                        });
+                        setMods((prev) => prev.filter((x) => x.id !== m.id));
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </span>
                 </li>
               ))}
               {mods.length === 0 && (
-                <li className="text-muted">No mods installed</li>
+                <li className="text-muted">No mods installed yet</li>
               )}
             </ul>
           </Card>
           <Card className="space-y-3">
             <h3 className="font-medium">Search / install</h3>
-            <p className="text-xs text-muted">
-              For Steam Workshop without an API key, paste the numeric Workshop
-              file ID and search.
-            </p>
             <div className="flex gap-2">
               <Input
                 value={modQuery}
                 onChange={(e) => setModQuery(e.target.value)}
-                placeholder="Search mods or Workshop file ID"
+                placeholder="e.g. jotunn, craftfromcontainers, or Steam Workshop ID"
+                disabled={modSearchBusy || !!modInstallBusy}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    (
+                      e.currentTarget.parentElement?.querySelector(
+                        "button",
+                      ) as HTMLButtonElement | null
+                    )?.click();
+                  }
+                }}
               />
               <Button
+                disabled={modSearchBusy || !!modInstallBusy}
                 onClick={async () => {
+                  setMessage("");
                   const providers = data.template.mods?.providers || [];
-                  const all = [];
-                  for (const p of providers) {
-                    const res = await fetch(
-                      `/api/servers/${id}/mods?provider=${p}&q=${encodeURIComponent(modQuery)}`,
-                    );
-                    const j = await res.json();
-                    all.push(...(j.results || []));
+                  if (!providers.length) {
+                    setMessage("This template has no mod providers");
+                    return;
                   }
-                  setModResults(all);
-                  if (!all.length) {
+                  setModSearchBusy(true);
+                  setModResults([]);
+                  try {
+                    const all = [];
+                    const errors: string[] = [];
+                    for (const p of providers) {
+                      const res = await fetch(
+                        `/api/servers/${id}/mods?provider=${p}&q=${encodeURIComponent(modQuery)}`,
+                        { signal: AbortSignal.timeout(25_000) },
+                      );
+                      const j = await res.json().catch(() => ({}));
+                      if (!res.ok) errors.push(j.error || p);
+                      else all.push(...(j.results || []));
+                    }
+                    setModResults(all);
+                    if (!all.length) {
+                      setMessage(
+                        errors[0] ||
+                          "No results — try a shorter name, or a Steam Workshop file ID",
+                      );
+                    }
+                  } catch (e) {
                     setMessage(
-                      "No results — for Steam, try a numeric Workshop file ID",
+                      e instanceof Error && e.name === "TimeoutError"
+                        ? "Search timed out — try again with a more specific name"
+                        : e instanceof Error
+                          ? e.message
+                          : "Search failed",
                     );
+                  } finally {
+                    setModSearchBusy(false);
                   }
                 }}
               >
-                Search
+                {modSearchBusy ? "Searching…" : "Search"}
               </Button>
             </div>
             <ul className="space-y-2 text-sm">
               {modResults.map((r) => (
-                <li key={`${r.provider}-${r.id}`} className="flex justify-between gap-2">
+                <li
+                  key={`${r.provider}-${r.id}`}
+                  className="flex justify-between gap-2"
+                >
                   <div>
                     <p className="font-medium">{r.name}</p>
                     <p className="text-xs text-muted">
-                      {r.provider} — {r.summary?.slice(0, 120)}
+                      {r.provider}
+                      {r.version ? ` · v${r.version}` : ""} —{" "}
+                      {r.summary?.slice(0, 120)}
                     </p>
                   </div>
                   <Button
                     size="sm"
+                    disabled={modSearchBusy || !!modInstallBusy}
                     onClick={async () => {
-                      await fetch(`/api/servers/${id}/mods`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          provider: r.provider,
-                          externalId: r.id,
-                          name: r.name,
-                        }),
-                      });
+                      const key = `${r.provider}-${r.id}`;
+                      setModInstallBusy(key);
                       setMessage(`Installing ${r.name}…`);
-                      const list = await fetch(`/api/servers/${id}/mods`).then(
-                        (x) => x.json(),
-                      );
-                      setMods(list.mods || []);
+                      try {
+                        const res = await fetch(`/api/servers/${id}/mods`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            provider: r.provider,
+                            externalId: r.id,
+                            name: r.name,
+                            version: r.version,
+                          }),
+                          signal: AbortSignal.timeout(120_000),
+                        });
+                        const j = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          setMessage(j.error || "Install failed");
+                          return;
+                        }
+                        const list = await fetch(`/api/servers/${id}/mods`).then(
+                          (x) => x.json(),
+                        );
+                        setMods(list.mods || []);
+                        setMessage(
+                          `Installed ${r.name}. Restart the server to load it.`,
+                        );
+                      } catch (e) {
+                        setMessage(
+                          e instanceof Error ? e.message : "Install failed",
+                        );
+                      } finally {
+                        setModInstallBusy(null);
+                      }
                     }}
                   >
-                    Install
+                    {modInstallBusy === `${r.provider}-${r.id}`
+                      ? "Installing…"
+                      : "Install"}
                   </Button>
                 </li>
               ))}

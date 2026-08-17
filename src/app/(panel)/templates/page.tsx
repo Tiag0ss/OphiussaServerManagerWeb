@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, Label, Textarea } from "@/components/ui/field";
+import { TemplateForm } from "@/components/template-form";
+import {
+  defaultConfigFromTemplate,
+  parseTemplateYaml,
+} from "@/lib/templates/definition";
+import type { GameTemplate } from "@/lib/templates/types";
 
 type TplMeta = {
   id: string;
@@ -19,6 +25,29 @@ export default function TemplatesPage() {
   const [yaml, setYaml] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"yaml" | "preview" | "split">("split");
+  const [previewConfig, setPreviewConfig] = useState<Record<string, unknown>>(
+    {},
+  );
+
+  const preview = useMemo(() => {
+    if (!yaml.trim()) {
+      return { tpl: null as GameTemplate | null, error: "" };
+    }
+    try {
+      return { tpl: parseTemplateYaml(yaml), error: "" };
+    } catch (e) {
+      return {
+        tpl: null as GameTemplate | null,
+        error: e instanceof Error ? e.message : "Invalid YAML",
+      };
+    }
+  }, [yaml]);
+
+  const previewValue = useMemo(() => {
+    if (!preview.tpl) return {};
+    return { ...defaultConfigFromTemplate(preview.tpl), ...previewConfig };
+  }, [preview.tpl, previewConfig]);
 
   async function reload() {
     const res = await fetch("/api/templates");
@@ -29,6 +58,10 @@ export default function TemplatesPage() {
   useEffect(() => {
     reload().catch(() => setMessage("Failed to load templates"));
   }, []);
+
+  useEffect(() => {
+    setPreviewConfig({});
+  }, [selectedId]);
 
   async function openEdit(id: string) {
     setSelectedId(id);
@@ -113,13 +146,16 @@ export default function TemplatesPage() {
     );
   }
 
+  const showYaml = tab === "yaml" || tab === "split";
+  const showPreview = tab === "preview" || tab === "split";
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Templates</h2>
           <p className="text-sm text-muted">
-            Game server blueprints — edit YAML or upload your own
+            Game server blueprints — edit YAML and preview the config form
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -150,7 +186,7 @@ export default function TemplatesPage() {
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
         <Card className="h-fit p-2">
           <ul className="space-y-0.5">
             {list.map((t) => (
@@ -193,8 +229,8 @@ export default function TemplatesPage() {
           </ul>
         </Card>
 
-        <Card>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <Label className="mb-0">
                 {selectedId ? `Editing ${selectedId}` : "New / paste YAML"}
@@ -204,6 +240,20 @@ export default function TemplatesPage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {(["yaml", "preview", "split"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={`rounded-md px-3 py-1.5 text-sm capitalize ${
+                    tab === t
+                      ? "bg-accent text-accent-fg"
+                      : "bg-card-elevated text-muted"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
               {selectedId && (
                 <>
                   <Button
@@ -227,14 +277,62 @@ export default function TemplatesPage() {
               </Button>
             </div>
           </div>
-          <Textarea
-            className="min-h-[560px] font-mono text-xs"
-            value={yaml}
-            onChange={(e) => setYaml(e.target.value)}
-            spellCheck={false}
-            placeholder="Select a template or paste YAML…"
-          />
-        </Card>
+
+          <div
+            className={`grid gap-4 ${
+              showYaml && showPreview ? "xl:grid-cols-2" : ""
+            }`}
+          >
+            {showYaml && (
+              <Card>
+                <Textarea
+                  className="min-h-[560px] font-mono text-xs"
+                  value={yaml}
+                  onChange={(e) => setYaml(e.target.value)}
+                  spellCheck={false}
+                  placeholder="Select a template or paste YAML…"
+                />
+              </Card>
+            )}
+            {showPreview && (
+              <Card className="space-y-4">
+                {preview.error ? (
+                  <p className="text-sm text-danger">{preview.error}</p>
+                ) : !preview.tpl ? (
+                  <p className="text-sm text-muted">
+                    Paste or select a template to preview the config form.
+                  </p>
+                ) : (
+                  <>
+                    <div>
+                      <h3 className="font-medium">{preview.tpl.name}</h3>
+                      <p className="text-sm text-muted">
+                        {preview.tpl.description || preview.tpl.id}
+                      </p>
+                      <p className="mt-1 font-mono text-xs text-muted">
+                        {preview.tpl.runtime.image}
+                        {preview.tpl.runtime.ports?.length
+                          ? ` · ${preview.tpl.runtime.ports
+                              .map(
+                                (p) => `${p.key} ${p.container}/${p.protocol}`,
+                              )
+                              .join(", ")}`
+                          : ""}
+                      </p>
+                    </div>
+                    <TemplateForm
+                      key={preview.tpl.id}
+                      template={preview.tpl}
+                      value={previewValue}
+                      onChange={setPreviewConfig}
+                      mode="all"
+                    />
+                  </>
+                )}
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

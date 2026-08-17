@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth/session";
-import { getUserPortRange, getUsedHostPorts, findConsecutiveFreePorts } from "@/lib/port-alloc";
+import { getUserPortRange, getUsedHostPorts, resolveHostPorts } from "@/lib/port-alloc";
 import { getUserQuotas, getUserResourceUsage, getQuotaHeadroom } from "@/lib/quotas";
 import { getSettings } from "@/lib/settings";
 import { getTemplate } from "@/lib/templates/load";
@@ -26,16 +26,12 @@ export async function GET(req: Request) {
     const tpl = getTemplate(templateId);
     if (tpl) {
       const used = getUsedHostPorts();
-      const block = findConsecutiveFreePorts(
-        range,
-        tpl.runtime.ports.length,
-        used,
-      );
-      if (block) {
+      try {
+        const resolved = resolveHostPorts(tpl, range, used);
         suggestedPorts = {};
-        tpl.runtime.ports.forEach((p, i) => {
-          suggestedPorts![p.key] = block[i]!;
-        });
+        for (const p of resolved) suggestedPorts[p.key] = p.hostPort;
+      } catch {
+        suggestedPorts = null;
       }
     }
   }

@@ -8,7 +8,7 @@ runtime:
   cpuLimit: 2
   restartPolicy: unless-stopped
   ports:
-    - { key: game, container: 2456, protocol: udp }
+    - { key: game, container: 2456, protocol: udp, listenEnv: SERVER_PORT }
     - { key: game2, container: 2457, protocol: udp }
     - { key: game3, container: 2458, protocol: udp }
   volumes:
@@ -25,6 +25,7 @@ runtime:
       - permittedlist.txt
       - prefs
       - bepinex
+      - BepInEx
       - valheimplus
     exclude:
       - backups

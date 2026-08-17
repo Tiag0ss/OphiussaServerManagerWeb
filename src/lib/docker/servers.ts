@@ -9,6 +9,7 @@ import {
   serverMods,
   serverPermissions,
   servers,
+  users,
 } from "../db/schema";
 import { getSettings } from "../settings";
 import { applyBinds } from "../templates/apply-binds";
@@ -22,11 +23,89 @@ import { serverBackupDir, serverDataDir, hostServerDataDir } from "../paths";
 import {
   ensureGameNetwork,
   getDocker,
+  connectContainerToGameNetwork,
+  CONTAINER_DNS,
+  isDockerDesktopEngine,
   LABEL_MANAGED,
+  LABEL_NETWORK_MODE,
+  LABEL_OWNER,
   LABEL_SERVER_ID,
+  LABEL_SERVER_NAME,
+  LABEL_TEMPLATE,
+  NETWORK_NAME,
 } from "./client";
 import { withServerLock } from "./locks";
 import { sendRcon } from "../rcon/client";
+
+/** Docker container names: [a-zA-Z0-9][a-zA-Z0-9_.-]* and typically ≤63 chars. */
+function dockerSlug(value: string, max = 20): string {
+  const s = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, max);
+  return s || "x";
+}
+
+/**
+ * Explicit name: ophiussa-{game}-{owner}-{server}-{id8}
+ * e.g. ophiussa-valheim-tiago-viking-kgSoYsaQ
+ */
+export function buildContainerName(opts: {
+  templateId: string;
+  ownerName: string;
+  serverName: string;
+  serverId: string;
+}): string {
+  const id8 = opts.serverId.slice(0, 8);
+  const parts = [
+    "ophiussa",
+    dockerSlug(opts.templateId, 16),
+    dockerSlug(opts.ownerName, 16),
+    dockerSlug(opts.serverName, 20),
+    id8,
+  ];
+  let name = parts.join("-");
+  if (name.length > 63) {
+    name = [
+      "ophiussa",
+      dockerSlug(opts.templateId, 12),
+      dockerSlug(opts.ownerName, 12),
+      dockerSlug(opts.serverName, 12),
+      id8,
+    ].join("-");
+  }
+  return name.slice(0, 63);
+}
+
+/** Remove every managed container for this server (by label + legacy name). */
+export async function removeServerContainers(serverId: string) {
+  const docker = getDocker();
+  const seen = new Set<string>();
+
+  const byLabel = await docker
+    .listContainers({
+      all: true,
+      filters: { label: [`${LABEL_SERVER_ID}=${serverId}`] },
+    })
+    .catch(() => []);
+
+  for (const c of byLabel) {
+    seen.add(c.Id);
+    await docker.getContainer(c.Id).remove({ force: true }).catch(() => undefined);
+  }
+
+  // Legacy short name from earlier versions
+  const legacy = `ophiussa-${serverId.slice(0, 8)}`;
+  try {
+    const info = await docker.getContainer(legacy).inspect();
+    if (!seen.has(info.Id)) {
+      await docker.getContainer(info.Id).remove({ force: true }).catch(() => undefined);
+    }
+  } catch {
+    /* not found */
+  }
+}
 
 function timeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -105,12 +184,21 @@ export async function reallocatePorts(
 }
 
 export async function createServerContainer(serverId: string) {
-  return withServerLock(serverId, async () => {
+  return withServerLock(serverId, () => createServerContainerUnlocked(serverId));
+}
+
+/** Must only be called while holding the server lock (or when no concurrent ops). */
+async function createServerContainerUnlocked(serverId: string) {
     const db = getDb();
     const server = db.select().from(servers).where(eq(servers.id, serverId)).get();
     if (!server) throw new Error("Server not found");
     const tpl = getTemplate(server.templateId);
     if (!tpl) throw new Error("Template not found");
+    const owner = db.select().from(users).where(eq(users.id, server.ownerId)).get();
+    const ownerLabel =
+      owner?.name?.trim() ||
+      owner?.email?.split("@")[0] ||
+      server.ownerId.slice(0, 8);
 
     const settings = getSettings();
     const config = mergeConfigWithDefaults(
@@ -132,6 +220,13 @@ export async function createServerContainer(serverId: string) {
     }
 
     const docker = getDocker();
+    // Avoid "name already in use" / stale containerId after failed recreates
+    await removeServerContainers(serverId);
+    db.update(servers)
+      .set({ containerId: null })
+      .where(eq(servers.id, serverId))
+      .run();
+
     await new Promise<void>((resolve, reject) => {
       docker.pull(
         tpl.runtime.image,
@@ -159,68 +254,157 @@ export async function createServerContainer(serverId: string) {
 
     const network = await ensureGameNetwork();
     const ExposedPorts: Record<string, object> = {};
-    const PortBindings: Record<string, Array<{ HostPort: string }>> = {};
+    const PortBindings: Record<
+      string,
+      Array<{ HostIp: string; HostPort: string }>
+    > = {};
     for (const p of ports) {
-      const key = `${p.containerPort}/${p.protocol}`;
+      const tplPort = tpl.runtime.ports.find((x) => x.key === p.key);
+      const cPort = tplPort?.matchHost ? p.hostPort : p.containerPort;
+      const key = `${cPort}/${p.protocol}`;
       ExposedPorts[key] = {};
-      PortBindings[key] = [{ HostPort: String(p.hostPort) }];
+      PortBindings[key] = [{ HostIp: "0.0.0.0", HostPort: String(p.hostPort) }];
     }
 
     const volumeMount = tpl.runtime.volumes[0]?.container || "/data";
-    const Env = Object.entries(applied.env).map(([k, v]) => `${k}=${v}`);
+    const envMap: Record<string, string> = { ...applied.env };
     // Images like Valheim drop privileges themselves via PUID/PGID — do not set Docker User
     // unless the template explicitly requests it (otherwise bootstrap fails with EPERM).
-    Env.push(`PUID=${settings.puid}`, `PGID=${settings.pgid}`);
+    envMap.PUID = String(settings.puid);
+    envMap.PGID = String(settings.pgid);
     if (applied.args.length) {
-      Env.push(`ADDITIONAL_ARGS=${applied.args.join(" ")}`);
+      envMap.ADDITIONAL_ARGS = applied.args.join(" ");
     }
 
-    const createOpts: Parameters<typeof docker.createContainer>[0] = {
-      name: `ophiussa-${serverId.slice(0, 8)}`,
-      Image: tpl.runtime.image,
-      Env,
-      Labels: {
-        [LABEL_MANAGED]: "true",
-        [LABEL_SERVER_ID]: serverId,
-      },
-      ExposedPorts,
-      HostConfig: {
-        Binds: [`${bindHostPath}:${volumeMount}`],
-        PortBindings,
-        Memory: server.memoryMb * 1024 * 1024,
-        NanoCpus: Math.round(server.cpuLimit * 1e9),
-        RestartPolicy: {
-          Name: (tpl.runtime.restartPolicy as "unless-stopped") || "unless-stopped",
-        },
-        NetworkMode: network,
-      },
-      StopTimeout: tpl.runtime.stopTimeout ?? 60,
+    const containerName = buildContainerName({
+      templateId: server.templateId,
+      ownerName: ownerLabel,
+      serverName: server.name,
+      serverId,
+    });
+
+    const forceHost =
+      !isDockerDesktopEngine() &&
+      (process.env.DOCKER_NETWORK_MODE === "host" ||
+        process.env.OPHIUSSA_NETWORK_MODE === "host");
+    const forceBridge =
+      isDockerDesktopEngine() ||
+      process.env.DOCKER_NETWORK_MODE === "bridge" ||
+      process.env.OPHIUSSA_NETWORK_MODE === "bridge";
+
+    const applyListenPorts = (mode: "bridge" | "host") => {
+      for (const tplPort of tpl.runtime.ports) {
+        if (!tplPort.listenEnv) continue;
+        if (mode === "bridge" && !tplPort.matchHost) continue;
+        const alloc = ports.find((p) => p.key === tplPort.key);
+        if (alloc) envMap[tplPort.listenEnv] = String(alloc.hostPort);
+      }
     };
-    if (tpl.runtime.user) {
-      createOpts.User = tpl.runtime.user;
-    }
 
-    let container;
-    try {
-      container = await timeout(
-        docker.createContainer(createOpts),
+    const buildCreateOpts = (mode: "bridge" | "host") => {
+      applyListenPorts(mode);
+      const Env = Object.entries(envMap).map(([k, v]) => `${k}=${v}`);
+      const opts: Parameters<typeof docker.createContainer>[0] = {
+        name: containerName,
+        Image: tpl.runtime.image,
+        Env,
+        Labels: {
+          [LABEL_MANAGED]: "true",
+          [LABEL_SERVER_ID]: serverId,
+          [LABEL_TEMPLATE]: server.templateId,
+          [LABEL_OWNER]: ownerLabel,
+          [LABEL_SERVER_NAME]: server.name,
+          [LABEL_NETWORK_MODE]: mode,
+        },
+        HostConfig: {
+          Binds: [`${bindHostPath}:${volumeMount}`],
+          Memory: server.memoryMb * 1024 * 1024,
+          NanoCpus: Math.round(server.cpuLimit * 1e9),
+          RestartPolicy: {
+            Name:
+              (tpl.runtime.restartPolicy as "unless-stopped") || "unless-stopped",
+          },
+          Dns: CONTAINER_DNS,
+        },
+        StopTimeout: tpl.runtime.stopTimeout ?? 60,
+      };
+      if (mode === "bridge") {
+        opts.ExposedPorts = ExposedPorts;
+        opts.HostConfig!.PortBindings = PortBindings;
+        opts.HostConfig!.NetworkMode = network;
+        opts.NetworkingConfig = {
+          EndpointsConfig: {
+            [network]: {
+              Aliases: [serverId.slice(0, 8), dockerSlug(server.name, 24)],
+            },
+          },
+        };
+      } else {
+        // Host netns: no Docker DNAT (works when host iptables/nft is broken).
+        // Game must listen on allocated host ports via listenEnv.
+        opts.HostConfig!.NetworkMode = "host";
+      }
+      if (tpl.runtime.user) opts.User = tpl.runtime.user;
+      return opts;
+    };
+
+    const createOnce = async (mode: "bridge" | "host") => {
+      const container = await timeout(
+        docker.createContainer(buildCreateOpts(mode)),
         60_000,
         "create container",
       );
-    } catch (e) {
-      // cleanup orphan if any
-      try {
-        const list = await docker.listContainers({
-          all: true,
-          filters: { label: [`${LABEL_SERVER_ID}=${serverId}`] },
+      if (mode === "bridge") {
+        await connectContainerToGameNetwork(container.id).catch((e) => {
+          console.warn("[docker] network connect:", e);
         });
-        for (const c of list) {
-          await docker.getContainer(c.Id).remove({ force: true });
+        const info = await container.inspect();
+        const attached = Boolean(
+          info.NetworkSettings?.Networks?.[NETWORK_NAME],
+        );
+        if (!attached) {
+          await container.remove({ force: true }).catch(() => undefined);
+          throw new Error(
+            "Container has no network endpoint (Docker port publish / iptables likely broken)",
+          );
         }
-      } catch {
-        /* ignore */
       }
-      throw e;
+      return container;
+    };
+
+    let container;
+    let usedMode: "bridge" | "host" = forceHost ? "host" : "bridge";
+    try {
+      if (forceHost) {
+        container = await createOnce("host");
+      } else {
+        try {
+          container = await createOnce("bridge");
+          usedMode = "bridge";
+        } catch (bridgeErr) {
+          if (forceBridge) throw bridgeErr;
+          console.warn(
+            "[docker] bridge+ports failed, falling back to host network:",
+            bridgeErr instanceof Error ? bridgeErr.message : bridgeErr,
+          );
+          usedMode = "host";
+          container = await createOnce("host");
+        }
+      }
+    } catch (e) {
+      await removeServerContainers(serverId).catch(() => undefined);
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(
+        msg.includes("Conflict") || msg.includes("already in use")
+          ? `Container name conflict (${containerName}). Removed leftovers — try Recreate again.`
+          : msg,
+      );
+    }
+
+    if (usedMode === "host") {
+      console.warn(
+        `[docker] ${containerName} using host network (Docker port publishing unavailable on this host)`,
+      );
     }
 
     db.update(servers)
@@ -234,7 +418,6 @@ export async function createServerContainer(serverId: string) {
       .run();
 
     return container.id;
-  });
 }
 
 export async function startServer(serverId: string) {
@@ -243,7 +426,7 @@ export async function startServer(serverId: string) {
     const server = db.select().from(servers).where(eq(servers.id, serverId)).get();
     if (!server) throw new Error("Server not found");
     if (!server.containerId) {
-      await createServerContainer(serverId);
+      await createServerContainerUnlocked(serverId);
       const refreshed = db
         .select()
         .from(servers)
@@ -257,7 +440,7 @@ export async function startServer(serverId: string) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("no such container") || msg.includes("404")) {
-          await createServerContainer(serverId);
+          await createServerContainerUnlocked(serverId);
           const refreshed = db
             .select()
             .from(servers)
@@ -321,23 +504,7 @@ export async function deleteServerWipe(serverId: string) {
     const server = db.select().from(servers).where(eq(servers.id, serverId)).get();
     if (!server) return;
 
-    const docker = getDocker();
-    if (server.containerId) {
-      try {
-        const c = docker.getContainer(server.containerId);
-        await c.stop({ t: 10 }).catch(() => undefined);
-        await c.remove({ force: true }).catch(() => undefined);
-      } catch {
-        /* ignore */
-      }
-    }
-    const orphans = await docker.listContainers({
-      all: true,
-      filters: { label: [`${LABEL_SERVER_ID}=${serverId}`] },
-    });
-    for (const c of orphans) {
-      await docker.getContainer(c.Id).remove({ force: true }).catch(() => undefined);
-    }
+    await removeServerContainers(serverId);
 
     const dataDir = serverDataDir(serverId);
     if (existsSync(dataDir)) rmSync(dataDir, { recursive: true, force: true });

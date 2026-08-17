@@ -6,7 +6,7 @@ import type { GameTemplate } from "@/lib/templates/types";
 import { TemplateForm } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
-import { SecretInput } from "@/components/ui/secret-input";
+import { syncSharedHostPorts } from "@/lib/port-share";
 
 function modsLabel(t: GameTemplate) {
   const p = t.mods?.providers || [];
@@ -72,6 +72,8 @@ export default function NewServerPage() {
       if ("serverPass" in defaults) defaults.serverPass = password;
       if ("serverPassword" in defaults) defaults.serverPassword = password;
       if ("password" in defaults) defaults.password = password;
+      if ("worldPassword" in defaults) defaults.worldPassword = password;
+      if ("connectionPassword" in defaults) defaults.connectionPassword = password;
     }
     setConfig(defaults);
   }, [templateId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -169,12 +171,17 @@ export default function NewServerPage() {
                     min={portRange.start}
                     max={portRange.end}
                     value={ports[p.key] ?? ""}
-                    onChange={(e) =>
-                      setPorts((prev) => ({
-                        ...prev,
-                        [p.key]: Number(e.target.value),
-                      }))
-                    }
+                    onChange={(e) => {
+                      const value = Number(e.target.value);
+                      setPorts((prev) =>
+                        syncSharedHostPorts(
+                          template.runtime.ports,
+                          prev,
+                          p.key,
+                          value,
+                        ),
+                      );
+                    }}
                   />
                 </div>
               ))}

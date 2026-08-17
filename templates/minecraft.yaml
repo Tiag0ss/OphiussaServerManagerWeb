@@ -1,0 +1,160 @@
+id: minecraft
+name: Minecraft Java
+description: Vanilla / Paper / Fabric / Forge dedicated server (itzg)
+runtime:
+  image: itzg/minecraft-server
+  stopTimeout: 60
+  memoryMb: 4096
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 25565, protocol: tcp, listenEnv: SERVER_PORT }
+    - { key: rcon, container: 25575, protocol: tcp }
+  volumes:
+    - { key: data, container: /data }
+  env:
+    EULA: "TRUE"
+    TZ: Europe/Lisbon
+    ENABLE_RCON: "true"
+  backup:
+    include:
+      - world
+      - world_nether
+      - world_the_end
+      - server.properties
+      - whitelist.json
+      - ops.json
+      - banned-players.json
+      - banned-ips.json
+      - config
+      - mods
+      - plugins
+    exclude:
+      - libraries
+      - versions
+      - logs
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: rconPassword
+  saveCommand: save-all
+mods:
+  providers: [curseforge]
+  curseforgeGameId: 432
+  installPath: mods
+options:
+  type:
+    - { value: VANILLA, label: Vanilla }
+    - { value: PAPER, label: Paper }
+    - { value: FABRIC, label: Fabric }
+    - { value: FORGE, label: Forge }
+    - { value: QUILT, label: Quilt }
+    - { value: SPIGOT, label: Spigot }
+  difficulty:
+    - { value: peaceful, label: Peaceful }
+    - { value: easy, label: Easy }
+    - { value: normal, label: Normal }
+    - { value: hard, label: Hard }
+  mode:
+    - { value: survival, label: Survival }
+    - { value: creative, label: Creative }
+    - { value: adventure, label: Adventure }
+    - { value: spectator, label: Spectator }
+fields:
+  - key: motd
+    type: string
+    group: Server
+    label: MOTD
+    default: A Minecraft Server
+    bind: { env: MOTD }
+  - key: type
+    type: select
+    group: Server
+    label: Server type
+    optionsFrom: type
+    default: PAPER
+    bind: { env: TYPE }
+  - key: version
+    type: string
+    group: Server
+    label: Minecraft version
+    default: LATEST
+    placeholder: LATEST or 1.21.1
+    bind: { env: VERSION }
+  - key: level
+    type: string
+    group: Server
+    label: World name
+    default: world
+    bind: { env: LEVEL }
+  - key: seed
+    type: string
+    group: Server
+    label: World seed
+    default: ""
+    advanced: true
+    bind: { env: SEED }
+  - key: difficulty
+    type: select
+    group: Gameplay
+    label: Difficulty
+    optionsFrom: difficulty
+    default: normal
+    bind: { env: DIFFICULTY }
+  - key: mode
+    type: select
+    group: Gameplay
+    label: Game mode
+    optionsFrom: mode
+    default: survival
+    bind: { env: MODE }
+  - key: maxPlayers
+    type: number
+    group: Gameplay
+    label: Max players
+    default: 20
+    min: 1
+    max: 200
+    bind: { env: MAX_PLAYERS }
+  - key: pvp
+    type: boolean
+    group: Gameplay
+    label: PvP
+    default: true
+    bind: { env: PVP, trueFalse: true }
+  - key: onlineMode
+    type: boolean
+    group: Gameplay
+    label: Online mode (Xbox / Mojang auth)
+    default: true
+    bind: { env: ONLINE_MODE, trueFalse: true }
+  - key: viewDistance
+    type: number
+    group: Gameplay
+    label: View distance
+    default: 10
+    min: 3
+    max: 32
+    advanced: true
+    bind: { env: VIEW_DISTANCE }
+  - key: rconPassword
+    type: string
+    group: Access
+    label: RCON password
+    secret: true
+    required: true
+    default: changeme
+    bind: { env: RCON_PASSWORD }
+  - key: ops
+    type: list
+    group: Access
+    label: Operators (UUID or name)
+    item: { type: string, placeholder: "Notch" }
+    default: []
+    bind: { env: OPS, join: "," }
+  - key: whitelist
+    type: boolean
+    group: Access
+    label: Enable whitelist
+    default: false
+    bind: { env: ENABLE_WHITELIST, trueFalse: true }

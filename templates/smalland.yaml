@@ -1,0 +1,139 @@
+id: smalland
+name: Smalland
+description: Smalland Survive the Wilds dedicated server (Steam app 808040)
+runtime:
+  image: lucasromanomr/smalland-steam-server
+  stopTimeout: 60
+  memoryMb: 4096
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 7777, protocol: udp, listenEnv: PORT, matchHost: true }
+    - { key: gameTcp, container: 7777, protocol: tcp, matchHost: true }
+    - { key: query, container: 7778, protocol: udp, matchHost: true }
+  volumes:
+    - { key: data, container: /home/steam/smalland }
+  env:
+    TZ: Europe/Lisbon
+    STEAMAPPID: "808040"
+  backup:
+    include:
+      - SMALLAND/Saved
+    exclude:
+      - steamapps
+      - steamcmd
+      - Engine
+      - SMALLAND/Binaries
+      - SMALLAND/Content
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: Smalland Server
+    bind: { env: SERVERNAME }
+  - key: worldName
+    type: string
+    group: Server
+    label: World name
+    required: true
+    default: World
+    description: Save file identifier (no spaces)
+    bind: { env: WORLDNAME }
+  - key: password
+    type: string
+    group: Access
+    label: Join password
+    secret: true
+    default: ""
+    description: Leave empty for an open server
+    bind: { env: PASSWORD }
+  - key: private
+    type: boolean
+    group: Server
+    label: Hide from server browser
+    default: false
+    bind: { env: PRIVATE }
+  - key: friendlyFire
+    type: boolean
+    group: World
+    label: Friendly fire (PvP)
+    default: false
+    bind: { env: FRIENDLYFIRE }
+  - key: peacefulMode
+    type: boolean
+    group: World
+    label: Peaceful mode
+    default: false
+    bind: { env: PEACEFULMODE }
+  - key: keepInventory
+    type: boolean
+    group: World
+    label: Keep inventory on death
+    default: false
+    bind: { env: KEEPINVENTORY }
+  - key: noDeterioration
+    type: boolean
+    group: World
+    label: Disable building deterioration
+    default: false
+    bind: { env: NODETERIORATION }
+  - key: lengthOfDay
+    type: number
+    group: World
+    label: Day length (seconds)
+    min: 60
+    max: 86400
+    default: 1800
+    advanced: true
+    bind: { env: LENGTHOFDAYSECONDS }
+  - key: lengthOfSeason
+    type: number
+    group: World
+    label: Season length (seconds)
+    min: 60
+    max: 604800
+    default: 10800
+    advanced: true
+    bind: { env: LENGTHOFSEASONSECONDS }
+  - key: creatureHealth
+    type: slider
+    group: World
+    label: Creature health
+    min: 20
+    max: 300
+    step: 10
+    default: 100
+    advanced: true
+    bind: { env: CREATUREHEALTHMODIFIER }
+  - key: creatureDamage
+    type: slider
+    group: World
+    label: Creature damage
+    min: 20
+    max: 300
+    step: 10
+    default: 100
+    advanced: true
+    bind: { env: CREATUREDAMAGEMODIFIER }
+  - key: nourishmentLoss
+    type: slider
+    group: World
+    label: Nourishment loss
+    min: 0
+    max: 100
+    step: 5
+    default: 100
+    advanced: true
+    bind: { env: NOURISHMENTLOSSMODIFIER }
+  - key: fallDamage
+    type: slider
+    group: World
+    label: Fall damage
+    min: 50
+    max: 100
+    step: 5
+    default: 100
+    advanced: true
+    bind: { env: FALLDAMAGEMODIFIER }

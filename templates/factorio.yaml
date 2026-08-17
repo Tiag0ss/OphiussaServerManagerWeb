@@ -1,0 +1,67 @@
+id: factorio
+name: Factorio
+description: Factorio dedicated server with autosave and optional mod updates
+runtime:
+  image: factoriotools/factorio
+  stopTimeout: 60
+  memoryMb: 2048
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 34197, protocol: udp }
+    - { key: rcon, container: 27015, protocol: tcp }
+  volumes:
+    - { key: data, container: /factorio }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - saves
+      - mods
+      - config
+      - script-output
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: rconPassword
+fields:
+  - key: saveName
+    type: string
+    group: Server
+    label: Save name
+    default: _autosave1
+    bind: { env: SAVE_NAME }
+  - key: generateNewSave
+    type: boolean
+    group: Server
+    label: Generate new save if missing
+    default: true
+    bind: { env: GENERATE_NEW_SAVE, trueFalse: true }
+  - key: updateModsOnStart
+    type: boolean
+    group: Server
+    label: Update mods on start
+    default: false
+    bind: { env: UPDATE_MODS_ON_START, trueFalse: true }
+  - key: username
+    type: string
+    group: Factorio.com
+    label: Factorio username (mod portal)
+    default: ""
+    advanced: true
+    bind: { env: USERNAME }
+  - key: token
+    type: string
+    group: Factorio.com
+    label: Factorio token
+    secret: true
+    default: ""
+    advanced: true
+    bind: { env: TOKEN }
+  - key: rconPassword
+    type: string
+    group: Access
+    label: RCON password
+    secret: true
+    default: ""
+    bind: { env: RCON_PASSWORD }

@@ -1,0 +1,63 @@
+id: project-zomboid
+name: Project Zomboid
+description: Project Zomboid dedicated server
+runtime:
+  image: renegademaster/zomboid-dedicated-server
+  stopTimeout: 90
+  memoryMb: 8192
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 16261, protocol: udp }
+    - { key: steam, container: 16262, protocol: udp }
+  volumes:
+    - { key: data, container: /home/steam/Zomboid }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - Saves
+      - Server
+      - db
+      - Lua
+mods:
+  providers: [steam-workshop]
+  workshopAppId: 108600
+  installPath: Workshop
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: Project Zomboid
+    bind: { env: SERVER_NAME }
+  - key: adminUsername
+    type: string
+    group: Server
+    label: Admin username
+    default: admin
+    bind: { env: ADMIN_USERNAME }
+  - key: adminPassword
+    type: string
+    group: Server
+    label: Admin password
+    secret: true
+    required: true
+    default: changeme
+    bind: { env: ADMIN_PASSWORD }
+  - key: serverPassword
+    type: string
+    group: Server
+    label: Join password
+    secret: true
+    default: ""
+    bind: { env: SERVER_PASSWORD }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players
+    default: 16
+    min: 1
+    max: 100
+    bind: { env: MAX_PLAYERS }

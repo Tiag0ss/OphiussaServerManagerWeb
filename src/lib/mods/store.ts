@@ -1,7 +1,16 @@
 import { spawn } from "child_process";
-import { mkdirSync, renameSync, existsSync, rmSync } from "fs";
+import {
+  mkdirSync,
+  renameSync,
+  existsSync,
+  rmSync,
+  writeFileSync,
+  readdirSync,
+  cpSync,
+  statSync,
+} from "fs";
 import path from "path";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { getDb } from "../db";
 import { serverMods, servers } from "../db/schema";
@@ -19,35 +28,56 @@ export type ModSearchResult = {
   provider: "thunderstore" | "curseforge" | "steam-workshop";
 };
 
+const TS_HEADERS = {
+  "User-Agent": "OphiussaServerManager/0.1 (+https://github.com/)",
+  Accept: "application/json",
+};
+
 export async function searchThunderstore(
-  namespace: string,
+  community: string,
   query: string,
 ): Promise<ModSearchResult[]> {
-  const url = `https://thunderstore.io/api/v1/package/?namespace=${encodeURIComponent(namespace)}`;
-  const res = await fetch(url, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error("Thunderstore search failed");
-  const data = (await res.json()) as Array<{
-    uuid4: string;
-    name: string;
-    owner: string;
-    versions: Array<{ version_number: string; description?: string; downloads: number }>;
-  }>;
-  const q = query.toLowerCase();
-  return data
-    .filter(
-      (p) =>
-        !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.owner.toLowerCase().includes(q),
-    )
-    .slice(0, 40)
+  // Never use /c/{community}/api/v1/package/ — that dumps the full index (~100MB+).
+  // Cyberstorm listing is a paginated search (~tens of KB).
+  const q = query.trim();
+  if (q.length > 0 && q.length < 2) {
+    throw new Error("Type at least 2 characters to search Thunderstore");
+  }
+
+  const url = new URL(
+    `https://thunderstore.io/api/cyberstorm/listing/${encodeURIComponent(community)}/`,
+  );
+  if (q) url.searchParams.set("q", q);
+  url.searchParams.set("page_size", "30");
+
+  const res = await fetch(url, {
+    headers: TS_HEADERS,
+    signal: AbortSignal.timeout(20_000),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Thunderstore search failed (${res.status})`);
+  }
+  const data = (await res.json()) as {
+    results?: Array<{
+      namespace: string;
+      name: string;
+      description?: string;
+      download_count?: number;
+      is_deprecated?: boolean;
+      is_nsfw?: boolean;
+    }>;
+  };
+
+  return (data.results || [])
+    .filter((p) => !p.is_deprecated && !p.is_nsfw)
+    .slice(0, 30)
     .map((p) => ({
-      id: `${p.owner}-${p.name}`,
-      name: `${p.owner}-${p.name}`,
-      author: p.owner,
-      summary: p.versions[0]?.description,
-      downloads: p.versions[0]?.downloads,
-      version: p.versions[0]?.version_number,
+      id: `${p.namespace}-${p.name}`,
+      name: `${p.namespace}-${p.name}`,
+      author: p.namespace,
+      summary: p.description,
+      downloads: p.download_count,
       provider: "thunderstore" as const,
     }));
 }
@@ -195,6 +225,24 @@ export async function installWorkshopMod(
     renameSync(steamPath, dest);
   }
 
+  const existing = db
+    .select()
+    .from(serverMods)
+    .where(
+      and(
+        eq(serverMods.serverId, serverId),
+        eq(serverMods.externalId, fileId),
+      ),
+    )
+    .get();
+  if (existing) {
+    db.update(serverMods)
+      .set({ name, installPath: dest })
+      .where(eq(serverMods.id, existing.id))
+      .run();
+    return existing.id;
+  }
+
   const id = nanoid();
   db.insert(serverMods)
     .values({
@@ -210,6 +258,102 @@ export async function installWorkshopMod(
   return id;
 }
 
+function extractZip(zipPath: string, destDir: string) {
+  mkdirSync(destDir, { recursive: true });
+  return new Promise<void>((resolve, reject) => {
+    const child = spawn(
+      "python3",
+      ["-c", "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])", zipPath, destDir],
+      { stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let err = "";
+    child.stderr.on("data", (d) => {
+      err += d.toString();
+    });
+    child.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(err || `zip extract failed (${code})`));
+    });
+  });
+}
+
+function mergeDir(src: string, dest: string) {
+  mkdirSync(dest, { recursive: true });
+  for (const name of readdirSync(src)) {
+    const from = path.join(src, name);
+    const to = path.join(dest, name);
+    if (statSync(from).isDirectory()) mergeDir(from, to);
+    else {
+      mkdirSync(path.dirname(to), { recursive: true });
+      cpSync(from, to);
+    }
+  }
+}
+
+function dirByNameInsensitive(parent: string, wanted: string): string | null {
+  if (!existsSync(parent)) return null;
+  const exact = path.join(parent, wanted);
+  if (existsSync(exact)) return exact;
+  const found = readdirSync(parent).find(
+    (n) => n.toLowerCase() === wanted.toLowerCase(),
+  );
+  return found ? path.join(parent, found) : null;
+}
+
+/** Template installPath is e.g. bepinex/plugins — that casing is what the image uses. */
+function bepinexRootFromInstallPath(dataDir: string, installPath: string) {
+  const rel = installPath.replace(/\\/g, "/");
+  const rootRel = rel.toLowerCase().endsWith("/plugins")
+    ? rel.slice(0, -"/plugins".length)
+    : rel.split("/")[0] || "bepinex";
+  return path.join(dataDir, rootRel);
+}
+
+function mergeWrongCaseBepInEx(dataDir: string, canonicalRoot: string) {
+  const canonicalName = path.basename(canonicalRoot);
+  if (!existsSync(dataDir)) return;
+  for (const name of readdirSync(dataDir)) {
+    if (name === canonicalName) continue;
+    if (name.toLowerCase() !== canonicalName.toLowerCase()) continue;
+    const wrong = path.join(dataDir, name);
+    if (!statSync(wrong).isDirectory()) continue;
+    mergeDir(wrong, canonicalRoot);
+    rmSync(wrong, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Place extracted Thunderstore package into the server data dir.
+ * Zips often ship `BepInEx/` (PascalCase); Valheim's image uses `bepinex/` (lowercase).
+ * Always merge into the template installPath casing so Linux does not create a second folder.
+ */
+function placeThunderstoreExtract(
+  extractDir: string,
+  dataDir: string,
+  installPath: string,
+) {
+  const pluginsDest = path.join(dataDir, installPath);
+  const bepinexDest = bepinexRootFromInstallPath(dataDir, installPath);
+
+  const zipBep = dirByNameInsensitive(extractDir, "BepInEx");
+  if (zipBep) {
+    mergeDir(zipBep, bepinexDest);
+    mergeWrongCaseBepInEx(dataDir, bepinexDest);
+    return pluginsDest;
+  }
+
+  const zipPlugins = dirByNameInsensitive(extractDir, "plugins");
+  if (zipPlugins) {
+    mergeDir(zipPlugins, pluginsDest);
+    mergeWrongCaseBepInEx(dataDir, bepinexDest);
+    return pluginsDest;
+  }
+
+  mergeDir(extractDir, path.join(pluginsDest, path.basename(extractDir)));
+  mergeWrongCaseBepInEx(dataDir, bepinexDest);
+  return pluginsDest;
+}
+
 export async function installThunderstoreMod(
   serverId: string,
   packageName: string,
@@ -219,19 +363,31 @@ export async function installThunderstoreMod(
   const server = db.select().from(servers).where(eq(servers.id, serverId)).get();
   if (!server) throw new Error("Server not found");
   const tpl = getTemplate(server.templateId);
-  const ns = tpl?.mods?.thunderstoreNamespace;
-  if (!ns) throw new Error("No Thunderstore namespace");
+  const community = tpl?.mods?.thunderstoreNamespace;
+  if (!community) throw new Error("No Thunderstore community on this template");
 
-  const [owner, name] = packageName.includes("-")
-    ? (() => {
-        const i = packageName.indexOf("-");
-        return [packageName.slice(0, i), packageName.slice(i + 1)] as const;
-      })()
-    : [ns, packageName] as const;
+  // Accept "Owner-Package" or "Owner/Package"
+  const normalized = packageName.replace(/\//g, "-");
+  const dash = normalized.indexOf("-");
+  if (dash <= 0) {
+    throw new Error(
+      'Invalid package id — expected "Author-PackageName" (e.g. ValheimModding-Jotunn)',
+    );
+  }
+  const owner = normalized.slice(0, dash);
+  const name = normalized.slice(dash + 1);
 
-  const metaUrl = `https://thunderstore.io/api/experimental/package/${owner}/${name}/`;
-  const metaRes = await fetch(metaUrl);
-  if (!metaRes.ok) throw new Error("Package not found on Thunderstore");
+  const metaUrl = `https://thunderstore.io/api/experimental/package/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/`;
+  const metaRes = await fetch(metaUrl, {
+    headers: TS_HEADERS,
+    signal: AbortSignal.timeout(20_000),
+    cache: "no-store",
+  });
+  if (!metaRes.ok) {
+    throw new Error(
+      `Package not found on Thunderstore (${owner}/${name}). Use Author-PackageName from search results.`,
+    );
+  }
   const meta = (await metaRes.json()) as {
     latest: { version_number: string; download_url: string };
   };
@@ -241,33 +397,99 @@ export async function installThunderstoreMod(
       ? `https://thunderstore.io/package/download/${owner}/${name}/${ver}/`
       : meta.latest.download_url;
 
-  const installRoot = path.join(
-    serverDataDir(serverId),
-    tpl?.mods?.installPath || "BepInEx/plugins",
-  );
-  mkdirSync(installRoot, { recursive: true });
-  const zipPath = path.join(installRoot, `${owner}-${name}-${ver}.zip`);
-  const res = await fetch(downloadUrl);
-  if (!res.ok) throw new Error("Download failed");
-  const buf = Buffer.from(await res.arrayBuffer());
-  const { writeFileSync } = await import("fs");
-  writeFileSync(zipPath, buf);
+  const dataDir = serverDataDir(serverId);
+  const installRel = tpl?.mods?.installPath || "bepinex/plugins";
+  const tmpRoot = path.join(dataDir, ".mod-tmp", nanoid());
+  const zipPath = path.join(tmpRoot, `${owner}-${name}-${ver}.zip`);
+  const extractDir = path.join(tmpRoot, "extract");
+  mkdirSync(extractDir, { recursive: true });
 
-  // extract with tar (zip) via unzip if available — store zip for now and note path
-  const id = nanoid();
-  db.insert(serverMods)
-    .values({
-      id,
-      serverId,
-      provider: "thunderstore",
-      externalId: `${owner}-${name}`,
-      name: `${owner}-${name}`,
-      version: ver,
-      installPath: zipPath,
-      createdAt: new Date(),
-    })
-    .run();
-  return id;
+  try {
+    const res = await fetch(downloadUrl, {
+      headers: TS_HEADERS,
+      signal: AbortSignal.timeout(90_000),
+    });
+    if (!res.ok) throw new Error("Download failed from Thunderstore");
+    writeFileSync(zipPath, Buffer.from(await res.arrayBuffer()));
+    await extractZip(zipPath, extractDir);
+    const placed = placeThunderstoreExtract(extractDir, dataDir, installRel);
+    // Move leftovers from a previous PascalCase extract (BepInEx vs bepinex)
+    mergeWrongCaseBepInEx(dataDir, bepinexRootFromInstallPath(dataDir, installRel));
+
+    const existing = db
+      .select()
+      .from(serverMods)
+      .where(
+        and(
+          eq(serverMods.serverId, serverId),
+          eq(serverMods.externalId, `${owner}-${name}`),
+        ),
+      )
+      .get();
+    if (existing) {
+      db.update(serverMods)
+        .set({
+          name: `${owner}-${name}`,
+          version: ver,
+          installPath: placed,
+        })
+        .where(eq(serverMods.id, existing.id))
+        .run();
+      return existing.id;
+    }
+
+    const id = nanoid();
+    db.insert(serverMods)
+      .values({
+        id,
+        serverId,
+        provider: "thunderstore",
+        externalId: `${owner}-${name}`,
+        name: `${owner}-${name}`,
+        version: ver,
+        installPath: placed,
+        createdAt: new Date(),
+      })
+      .run();
+    return id;
+  } finally {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+}
+
+export async function reinstallMod(modId: string) {
+  const db = getDb();
+  const mod = db.select().from(serverMods).where(eq(serverMods.id, modId)).get();
+  if (!mod) throw new Error("Mod not found");
+  if (mod.provider === "thunderstore") {
+    return installThunderstoreMod(mod.serverId, mod.externalId);
+  }
+  if (mod.provider === "steam-workshop") {
+    return installWorkshopMod(mod.serverId, mod.externalId, mod.name);
+  }
+  throw new Error(`Cannot reinstall ${mod.provider} mods`);
+}
+
+export async function reinstallAllMods(serverId: string) {
+  const db = getDb();
+  const list = db
+    .select()
+    .from(serverMods)
+    .where(eq(serverMods.serverId, serverId))
+    .all();
+  if (!list.length) throw new Error("No mods to reinstall");
+  const errors: string[] = [];
+  for (const m of list) {
+    try {
+      await reinstallMod(m.id);
+    } catch (e) {
+      errors.push(`${m.name}: ${e instanceof Error ? e.message : "failed"}`);
+    }
+  }
+  if (errors.length) {
+    throw new Error(`Reinstall finished with errors — ${errors.join("; ")}`);
+  }
+  return list.length;
 }
 
 export async function removeMod(modId: string) {

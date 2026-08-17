@@ -9,6 +9,8 @@ import { servers } from "@/lib/db/schema";
 import {
   installThunderstoreMod,
   installWorkshopMod,
+  reinstallAllMods,
+  reinstallMod,
   removeMod,
   searchCurseforge,
   searchThunderstore,
@@ -74,6 +76,17 @@ export async function POST(req: Request, ctx: Ctx) {
   }
   const body = await req.json();
   try {
+    if (body.action === "reinstall") {
+      if (!body.modId) {
+        return NextResponse.json({ error: "modId required" }, { status: 400 });
+      }
+      await reinstallMod(body.modId);
+      return NextResponse.json({ ok: true });
+    }
+    if (body.action === "reinstall-all") {
+      const count = await reinstallAllMods(id);
+      return NextResponse.json({ ok: true, count });
+    }
     if (body.provider === "steam-workshop") {
       const modId = await installWorkshopMod(id, body.externalId, body.name);
       return NextResponse.json({ id: modId });

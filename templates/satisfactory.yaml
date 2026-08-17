@@ -1,0 +1,77 @@
+id: satisfactory
+name: Satisfactory
+description: Satisfactory dedicated server (wolveix) — game port is TCP+UDP on the same host port
+runtime:
+  image: wolveix/satisfactory-server
+  stopTimeout: 90
+  memoryMb: 8192
+  cpuLimit: 4
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 7777, protocol: udp, listenEnv: SERVERGAMEPORT, matchHost: true }
+    - { key: gameTcp, container: 7777, protocol: tcp, matchHost: true }
+    - { key: messaging, container: 8888, protocol: tcp, listenEnv: SERVERMESSAGINGPORT, matchHost: true }
+  volumes:
+    - { key: data, container: /config }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - saved
+      - gamefiles/FactoryGame/Saved
+    exclude:
+      - gamefiles
+      - backuptmp
+fields:
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 32
+    default: 4
+    bind: { env: MAXPLAYERS }
+  - key: maxTickRate
+    type: number
+    group: Server
+    label: Max tick rate
+    min: 15
+    max: 120
+    default: 30
+    advanced: true
+    bind: { env: MAXTICKRATE }
+  - key: autosaveNum
+    type: number
+    group: Maintenance
+    label: Rotating autosaves
+    min: 1
+    max: 50
+    default: 5
+    bind: { env: AUTOSAVENUM }
+  - key: disableSeasonalEvents
+    type: boolean
+    group: Server
+    label: Disable seasonal events
+    default: false
+    bind: { env: DISABLESEASONALEVENTS, trueFalse: true }
+  - key: serverStreaming
+    type: boolean
+    group: Server
+    label: Asset streaming
+    default: true
+    advanced: true
+    bind: { env: SERVERSTREAMING, trueFalse: true }
+  - key: skipUpdate
+    type: boolean
+    group: Maintenance
+    label: Skip update on start
+    default: false
+    advanced: true
+    bind: { env: SKIPUPDATE, trueFalse: true }
+  - key: steamBeta
+    type: boolean
+    group: Maintenance
+    label: Experimental Steam beta
+    default: false
+    advanced: true
+    bind: { env: STEAMBETA, trueFalse: true }

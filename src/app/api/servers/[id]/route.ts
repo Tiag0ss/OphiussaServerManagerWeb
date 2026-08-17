@@ -47,6 +47,34 @@ export async function GET(_req: Request, ctx: Ctx) {
   const quotas = getQuotaHeadroom(headroomOwnerId, id);
   const { getUserPortRange } = await import("@/lib/port-alloc");
   const portRange = getUserPortRange(server.ownerId);
+  const { users } = await import("@/lib/db/schema");
+  const owner = db.select().from(users).where(eq(users.id, server.ownerId)).get();
+  const ownerLabel =
+    owner?.name?.trim() ||
+    owner?.email?.split("@")[0] ||
+    server.ownerId.slice(0, 8);
+  const { buildContainerName } = await import("@/lib/docker/servers");
+  const { getDocker, getDockerSocketPath, LABEL_NETWORK_MODE } = await import(
+    "@/lib/docker/client"
+  );
+  const containerName = buildContainerName({
+    templateId: server.templateId,
+    ownerName: ownerLabel,
+    serverName: server.name,
+    serverId: id,
+  });
+  let networkMode = "ophiussa_games";
+  if (server.containerId) {
+    try {
+      const info = await getDocker().getContainer(server.containerId).inspect();
+      networkMode =
+        info.Config?.Labels?.[LABEL_NETWORK_MODE] ||
+        info.HostConfig?.NetworkMode ||
+        networkMode;
+    } catch {
+      /* ignore */
+    }
+  }
   return NextResponse.json({
     server: {
       ...server,
@@ -61,6 +89,10 @@ export async function GET(_req: Request, ctx: Ctx) {
     stats,
     quotas,
     portRange,
+    containerName,
+    ownerName: ownerLabel,
+    dockerNetwork: networkMode,
+    dockerSocket: getDockerSocketPath(),
     isAdmin: user.role === "admin",
     publicIp: settings.publicIp,
     ftpPort: ftpPort(),
@@ -135,19 +167,24 @@ export async function PATCH(req: Request, ctx: Ctx) {
   db.update(servers).set(patch).where(eq(servers.id, id)).run();
 
   if (shouldRecreate) {
-    if (server.containerId) {
+    try {
       await stopServer(id).catch(() => undefined);
-      const { getDocker } = await import("@/lib/docker/client");
-      await getDocker()
-        .getContainer(server.containerId)
-        .remove({ force: true })
-        .catch(() => undefined);
+      const { removeServerContainers } = await import("@/lib/docker/servers");
+      await removeServerContainers(id);
       db.update(servers)
-        .set({ containerId: null })
+        .set({ containerId: null, status: "stopped", updatedAt: new Date() })
         .where(eq(servers.id, id))
         .run();
+      await createServerContainer(id);
+    } catch (e) {
+      return NextResponse.json(
+        {
+          error:
+            e instanceof Error ? e.message : "Failed to recreate container",
+        },
+        { status: 500 },
+      );
     }
-    await createServerContainer(id);
   }
 
   return NextResponse.json({ ok: true, recreated: shouldRecreate });

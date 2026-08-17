@@ -1,0 +1,84 @@
+id: conan-exiles
+name: Conan Exiles
+description: Conan Exiles (Age of Sorcery / Enhanced) dedicated server with RCON and Workshop mods
+runtime:
+  image: indifferentbroccoli/conan-exiles-enhanced-server-docker
+  stopTimeout: 90
+  memoryMb: 8192
+  cpuLimit: 4
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 7777, protocol: udp, listenEnv: PORT, matchHost: true }
+    - { key: gameRaw, container: 7778, protocol: udp, matchHost: true }
+    - { key: query, container: 27015, protocol: udp, listenEnv: QUERY_PORT, matchHost: true }
+    - { key: rcon, container: 25575, protocol: tcp, listenEnv: RCON_PORT, matchHost: true }
+  volumes:
+    - { key: data, container: /home/steam/server-files }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - ConanSandbox/Saved
+    exclude:
+      - steamapps
+      - steamcmd
+      - Engine
+      - ConanSandbox/Binaries
+      - ConanSandbox/Content
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: rconPassword
+  saveCommand: saveworld
+mods:
+  providers: [steam-workshop]
+  workshopAppId: 440900
+  installPath: ConanSandbox/Mods
+  bind: { env: MODS, join: "," }
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: Conan Exiles Server
+    bind: { env: SERVER_NAME }
+  - key: serverPassword
+    type: string
+    group: Access
+    label: Join password
+    secret: true
+    default: ""
+    description: Leave empty for a public server
+    bind: { env: SERVER_PASSWORD }
+  - key: adminPassword
+    type: string
+    group: Access
+    label: Admin password
+    secret: true
+    required: true
+    default: changeme
+    bind: { env: ADMIN_PASSWORD }
+  - key: rconPassword
+    type: string
+    group: Access
+    label: RCON password
+    secret: true
+    required: true
+    default: changeme
+    bind: { env: RCON_PASSWORD }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 70
+    default: 40
+    bind: { env: MAX_PLAYERS }
+  - key: updateOnStart
+    type: boolean
+    group: Maintenance
+    label: Update on start
+    default: true
+    advanced: true
+    bind: { env: UPDATE_ON_START, trueFalse: true }

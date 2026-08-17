@@ -1,0 +1,129 @@
+id: core-keeper
+name: Core Keeper
+description: Core Keeper dedicated server (escaping) — Direct Connect on the allocated UDP port
+runtime:
+  image: escaping/core-keeper-dedicated
+  stopTimeout: 120
+  memoryMb: 4096
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 27015, protocol: udp, listenEnv: SERVER_PORT, matchHost: true }
+  volumes:
+    - { key: data, container: /home/steam/core-keeper-data }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - .
+    exclude:
+      - steamapps
+      - steamcmd
+options:
+  worldMode:
+    - { value: "0", label: Normal }
+    - { value: "1", label: Hard }
+    - { value: "2", label: Creative }
+    - { value: "4", label: Casual }
+  season:
+    - { value: "", label: Real date }
+    - { value: "0", label: None }
+    - { value: "1", label: Easter }
+    - { value: "2", label: Halloween }
+    - { value: "3", label: Christmas }
+    - { value: "4", label: Valentine }
+    - { value: "5", label: Anniversary }
+    - { value: "6", label: Cherry blossom }
+    - { value: "7", label: Lunar New Year }
+fields:
+  - key: worldName
+    type: string
+    group: Server
+    label: World name
+    required: true
+    default: Core Keeper Server
+    bind: { env: WORLD_NAME }
+  - key: worldSeed
+    type: string
+    group: World
+    label: World seed
+    default: ""
+    description: Empty = random. Only used when the world is first created.
+    bind: { env: WORLD_SEED }
+  - key: worldMode
+    type: select
+    group: World
+    label: World mode
+    optionsFrom: worldMode
+    default: "0"
+    bind: { env: WORLD_MODE }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 10
+    default: 8
+    bind: { env: MAX_PLAYERS }
+  - key: password
+    type: string
+    group: Access
+    label: Direct-connect password
+    secret: true
+    default: ""
+    description: Max 28 characters. Empty generates a random password.
+    bind: { env: PASSWORD }
+  - key: gameId
+    type: string
+    group: Server
+    label: Game ID
+    advanced: true
+    default: ""
+    description: 15–28 alphanumeric characters. Empty generates a new ID.
+    bind: { env: GAME_ID }
+  - key: season
+    type: select
+    group: World
+    label: Season override
+    optionsFrom: season
+    default: ""
+    advanced: true
+    bind: { env: SEASON }
+  - key: discordWebhook
+    type: string
+    group: Hooks
+    label: Discord webhook URL
+    advanced: true
+    default: ""
+    bind: { env: DISCORD_WEBHOOK_URL }
+  - key: modsEnabled
+    type: boolean
+    group: Mods
+    label: Enable mod.io mods
+    default: false
+    bind: { env: MODS_ENABLED, trueFalse: true }
+  - key: modioApiKey
+    type: string
+    group: Mods
+    label: mod.io API key
+    secret: true
+    advanced: true
+    default: ""
+    showIf: { field: modsEnabled, equals: true }
+    bind: { env: MODIO_API_KEY }
+  - key: modioApiUrl
+    type: string
+    group: Mods
+    label: mod.io API URL
+    advanced: true
+    default: ""
+    showIf: { field: modsEnabled, equals: true }
+    bind: { env: MODIO_API_URL }
+  - key: mods
+    type: list
+    group: Mods
+    label: Mods (mod.io IDs)
+    item: { type: string, placeholder: core-lib }
+    default: []
+    showIf: { field: modsEnabled, equals: true }
+    bind: { env: MODS, join: "," }

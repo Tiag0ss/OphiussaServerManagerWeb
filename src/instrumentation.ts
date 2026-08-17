@@ -7,19 +7,31 @@ export async function register() {
     const { syncTemplatesToDb } = await import("./lib/templates/load");
     syncTemplatesToDb();
 
-    if (process.env.NODE_ENV === "production") {
-      const { existsSync } = await import("fs");
-      const sock = process.env.DOCKER_SOCKET || "/var/run/docker.sock";
-      if (existsSync(sock)) {
-        const { reconcileServers } = await import("./lib/docker/servers");
-        const { startDockerEventSync } = await import("./lib/docker/events");
-        await reconcileServers().catch((e) =>
-          console.error("[reconcile]", e),
+    const { existsSync } = await import("fs");
+    const { resolveDockerSocket } = await import("./lib/docker/client");
+    const sock = resolveDockerSocket();
+
+    const startDockerSync = async () => {
+      if (!existsSync(sock)) {
+        console.warn(
+          `[instrumentation] docker.sock not found (${sock}) — skipping Docker sync`,
         );
-        startDockerEventSync();
-      } else {
-        console.warn("[instrumentation] docker.sock not found — skipping Docker sync");
+        return;
       }
+      const { reconcileServers } = await import("./lib/docker/servers");
+      const { startDockerEventSync } = await import("./lib/docker/events");
+      await reconcileServers().catch((e) => console.error("[reconcile]", e));
+      startDockerEventSync();
+      const g = globalThis as { __ophiussaReconcileTimer?: ReturnType<typeof setInterval> };
+      if (!g.__ophiussaReconcileTimer) {
+        g.__ophiussaReconcileTimer = setInterval(() => {
+          reconcileServers().catch(() => undefined);
+        }, 30_000);
+      }
+    };
+
+    if (process.env.NODE_ENV === "production") {
+      await startDockerSync();
       const { startFtpServer, startSftpServer } = await import("./lib/ftp/servers");
       const { refreshSchedules } = await import("./lib/schedules/runner");
 
@@ -27,8 +39,8 @@ export async function register() {
       startSftpServer();
       refreshSchedules();
     } else {
-      // In development, still sync templates and start lightweight services
       try {
+        await startDockerSync();
         const { startFtpServer, startSftpServer } = await import("./lib/ftp/servers");
         const { refreshSchedules } = await import("./lib/schedules/runner");
         await startFtpServer();

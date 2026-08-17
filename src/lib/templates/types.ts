@@ -60,6 +60,17 @@ export type TemplatePort = {
   key: string;
   container: number;
   protocol: "tcp" | "udp";
+  /**
+   * When Docker cannot publish ports (broken host iptables) we fall back to
+   * host networking and set this env var to the allocated host port so the
+   * game listens on the right address.
+   */
+  listenEnv?: string;
+  /**
+   * Publish hostPort:hostPort and set listenEnv (if any) in bridge mode too.
+   * Needed when the game advertises its listen port (Unreal / Satisfactory).
+   */
+  matchHost?: boolean;
 };
 
 export type TemplateVolume = {

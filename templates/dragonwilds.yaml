@@ -1,0 +1,78 @@
+id: dragonwilds
+name: RuneScape Dragonwilds
+description: RuneScape Dragonwilds dedicated server — UDP port must match inside and outside the container
+runtime:
+  image: indifferentbroccoli/runescape-dragonwilds-server-docker
+  stopTimeout: 60
+  memoryMb: 8192
+  cpuLimit: 4
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 7777, protocol: udp, listenEnv: DEFAULT_PORT, matchHost: true }
+  volumes:
+    - { key: data, container: /home/steam/server-files }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - RSDragonwilds/Saved
+    exclude:
+      - steamapps
+      - steamcmd
+      - Engine
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: DragonWildsServer
+    bind: { env: SERVER_NAME }
+  - key: worldName
+    type: string
+    group: Server
+    label: Default world name
+    required: true
+    default: MyWorld
+    description: Used when the world is first created
+    bind: { env: DEFAULT_WORLD_NAME }
+  - key: ownerId
+    type: string
+    group: Server
+    label: Owner player ID
+    required: true
+    default: ""
+    description: RuneScape Dragonwilds player ID from the in-game Settings menu
+    bind: { env: OWNER_ID }
+  - key: adminPassword
+    type: string
+    group: Access
+    label: Admin password
+    secret: true
+    required: true
+    default: changeme
+    description: Required for Server Management in-game
+    bind: { env: ADMIN_PASSWORD }
+  - key: worldPassword
+    type: string
+    group: Access
+    label: Join password
+    secret: true
+    default: ""
+    description: Leave empty for a public server
+    bind: { env: WORLD_PASSWORD }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players
+    min: 1
+    max: 6
+    default: 6
+    bind: { env: MAX_PLAYERS }
+  - key: updateOnStart
+    type: boolean
+    group: Maintenance
+    label: Update on start
+    default: true
+    advanced: true
+    bind: { env: UPDATE_ON_START, trueFalse: true }

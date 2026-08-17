@@ -1,0 +1,54 @@
+id: enshrouded
+name: Enshrouded
+description: Enshrouded dedicated server (mornedhels)
+runtime:
+  image: mornedhels/enshrouded-server
+  stopTimeout: 90
+  memoryMb: 8192
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 15636, protocol: udp, listenEnv: SERVER_PORT }
+    - { key: query, container: 15637, protocol: udp }
+  volumes:
+    - { key: data, container: /opt/enshrouded }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - savegame
+      - enshrouded_server.json
+mods:
+  providers: [thunderstore]
+  thunderstoreNamespace: enshrouded
+  installPath: BepInEx/plugins
+fields:
+  - key: serverName
+    type: string
+    group: Server
+    label: Server name
+    required: true
+    default: Enshrouded Server
+    bind: { env: SERVER_NAME }
+  - key: serverPassword
+    type: string
+    group: Server
+    label: Password
+    secret: true
+    default: changeme
+    bind: { env: SERVER_PASSWORD }
+  - key: slots
+    type: number
+    group: Server
+    label: Player slots
+    default: 16
+    min: 1
+    max: 16
+    bind: { env: SERVER_SLOT_COUNT }
+  - key: queryPort
+    type: number
+    group: Server
+    label: Query port (container)
+    default: 15637
+    advanced: true
+    bind: { env: QUERY_PORT }
