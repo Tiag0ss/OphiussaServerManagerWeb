@@ -14,6 +14,7 @@ export function SecretInput({
   id,
   name,
   defaultValue,
+  readOnly,
 }: {
   value?: string;
   onChange?: (v: string) => void;
@@ -23,12 +24,13 @@ export function SecretInput({
   id?: string;
   name?: string;
   defaultValue?: string;
+  readOnly?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   const [copied, setCopied] = useState(false);
   const [internal, setInternal] = useState(defaultValue ?? "");
-  const controlled = value !== undefined && onChange !== undefined;
-  const current = controlled ? value : internal;
+  const current = value ?? internal;
+  const editable = !readOnly && onChange !== undefined;
 
   async function copy() {
     if (!current) return;
@@ -50,12 +52,14 @@ export function SecretInput({
         placeholder={placeholder}
         required={required}
         value={current}
+        readOnly={readOnly}
         onChange={(e) => {
-          if (controlled) onChange(e.target.value);
-          else setInternal(e.target.value);
+          if (!editable) return;
+          onChange!(e.target.value);
+          if (value === undefined) setInternal(e.target.value);
         }}
         autoComplete="new-password"
-        className="flex-1"
+        className="flex-1 font-mono text-xs"
       />
       <Button
         type="button"

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { hashPassword, generatePassword } from "@/lib/auth/password";
+import { encryptSecret } from "@/lib/secrets";
 import { requireSession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { servers } from "@/lib/db/schema";
@@ -114,6 +115,7 @@ export async function POST(req: Request) {
       ftpEnabled: true,
       ftpUsername,
       ftpPasswordHash: await hashPassword(ftpPassword),
+      ftpPasswordEnc: encryptSecret(ftpPassword),
       createdAt: new Date(),
       updatedAt: new Date(),
     })

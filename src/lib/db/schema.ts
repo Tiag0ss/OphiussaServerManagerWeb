@@ -63,6 +63,8 @@ export const servers = sqliteTable("servers", {
     .default(true),
   ftpUsername: text("ftp_username"),
   ftpPasswordHash: text("ftp_password_hash"),
+  /** AES-GCM encrypted FTP password (retrievable by authorized panel users). */
+  ftpPasswordEnc: text("ftp_password_enc"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });

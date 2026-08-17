@@ -19,6 +19,7 @@ import {
 import { getTemplate, mergeConfigWithDefaults } from "@/lib/templates/load";
 import { getSettings } from "@/lib/settings";
 import { generatePassword, hashPassword } from "@/lib/auth/password";
+import { decryptSecret, encryptSecret } from "@/lib/secrets";
 import { ftpPort, sftpPort } from "@/lib/ports";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,12 @@ export async function GET(_req: Request, ctx: Ctx) {
       /* ignore */
     }
   }
+  const canRevealFtp =
+    canAccessServer(user, id, "files") ||
+    canAccessServer(user, id, "settings");
+  const ftpPassword = canRevealFtp
+    ? decryptSecret(server.ftpPasswordEnc)
+    : null;
   return NextResponse.json({
     server: {
       ...server,
@@ -83,6 +90,7 @@ export async function GET(_req: Request, ctx: Ctx) {
         JSON.parse(server.configJson) as Record<string, unknown>,
       ),
       ftpPasswordHash: undefined,
+      ftpPasswordEnc: undefined,
     },
     template: tpl,
     ports,
@@ -97,6 +105,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     publicIp: settings.publicIp,
     ftpPort: ftpPort(),
     sftpPort: sftpPort(),
+    ftpPassword,
   });
 }
 
@@ -237,11 +246,17 @@ export async function POST(req: Request, ctx: Ctx) {
         await restartServer(id);
         break;
       case "reset-ftp-password": {
-        if (!canAccessServer(user, id, "settings")) throw new Error("FORBIDDEN");
+        if (
+          !canAccessServer(user, id, "settings") &&
+          !canAccessServer(user, id, "files")
+        ) {
+          throw new Error("FORBIDDEN");
+        }
         const pw = generatePassword(14);
         db.update(servers)
           .set({
             ftpPasswordHash: await hashPassword(pw),
+            ftpPasswordEnc: encryptSecret(pw),
             updatedAt: new Date(),
           })
           .where(eq(servers.id, id))

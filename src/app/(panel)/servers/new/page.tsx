@@ -6,6 +6,7 @@ import type { GameTemplate } from "@/lib/templates/types";
 import { TemplateForm } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
+import { SecretInput } from "@/components/ui/secret-input";
 import { syncSharedHostPorts } from "@/lib/port-share";
 
 function modsLabel(t: GameTemplate) {

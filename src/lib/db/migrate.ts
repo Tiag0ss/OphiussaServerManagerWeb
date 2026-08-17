@@ -101,6 +101,7 @@ const ALTERS = [
   `ALTER TABLE users ADD COLUMN port_range_end INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE templates ADD COLUMN source TEXT NOT NULL DEFAULT 'builtin'`,
   `ALTER TABLE backups ADD COLUMN label TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE servers ADD COLUMN ftp_password_enc TEXT`,
 ];
 
 export function migrate(sqlite: Database.Database) {

@@ -8,9 +8,11 @@ import { TemplateForm } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
 import { CopyJoinButton } from "@/components/copy-join-button";
+import { CopyTextButton } from "@/components/copy-text-button";
 import { joinAddress } from "@/lib/join-address";
 import { syncSharedHostPorts } from "@/lib/port-share";
 import type { GameTemplate } from "@/lib/templates/types";
+import { SecretInput } from "@/components/ui/secret-input";
 
 type QuotaHeadroom = {
   maxServers: number;
@@ -54,6 +56,7 @@ type ServerPayload = {
   publicIp: string;
   ftpPort?: number;
   sftpPort?: number;
+  ftpPassword?: string | null;
 };
 
 export default function ServerDetailPage() {
@@ -112,6 +115,8 @@ export default function ServerDetailPage() {
   >([]);
   const [confirmName, setConfirmName] = useState("");
   const [message, setMessage] = useState("");
+  const [ftpPassword, setFtpPassword] = useState<string | null>(null);
+  const [ftpResetBusy, setFtpResetBusy] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/servers/${id}`);
@@ -121,6 +126,7 @@ export default function ServerDetailPage() {
     setConfig(json.server.config);
     setMemoryMb(json.server.memoryMb);
     setCpuLimit(json.server.cpuLimit);
+    setFtpPassword(json.ftpPassword ?? null);
     const draft: Record<string, number> = {};
     for (const p of json.ports || []) draft[p.key] = p.hostPort;
     setPortDraft(draft);
@@ -182,12 +188,21 @@ export default function ServerDetailPage() {
     const json = await res.json();
     if (!res.ok) setMessage(json.error || "Failed");
     else if (json.ftpPassword) {
-      setMessage(
-        `FTP password reset: ${json.ftpUsername} / ${json.ftpPassword}`,
-      );
+      setFtpPassword(json.ftpPassword);
+      setMessage("FTP password reset — copy it below.");
     } else {
       setMessage("Done");
       load();
+    }
+  }
+
+  async function resetFtpPassword() {
+    setFtpResetBusy(true);
+    setMessage("");
+    try {
+      await action("reset-ftp-password");
+    } finally {
+      setFtpResetBusy(false);
     }
   }
 
@@ -397,22 +412,52 @@ export default function ServerDetailPage() {
               Apply ports
             </Button>
           </Card>
-          <Card>
+          <Card className="space-y-3">
             <h3 className="font-medium">FTP / SFTP</h3>
-            <p className="mt-2 text-sm text-muted">
-              User: <code>{data.server.ftpUsername}</code>
+            <p className="text-sm text-muted">
+              Host: <code>{data.publicIp || "localhost"}</code>
               <br />
               Ports: FTP {data.ftpPort ?? 2121} · SFTP {data.sftpPort ?? 2022}
               <br />
               Enabled: {data.server.ftpEnabled ? "yes" : "no"}
             </p>
+            {data.server.ftpUsername ? (
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs text-muted">Username</Label>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <code className="rounded-md border border-border bg-card-elevated px-2 py-1 text-xs">
+                      {data.server.ftpUsername}
+                    </code>
+                    <CopyTextButton text={data.server.ftpUsername} label="Copy user" />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted">Password</Label>
+                  {ftpPassword ? (
+                    <SecretInput
+                      className="mt-1"
+                      value={ftpPassword}
+                      readOnly
+                    />
+                  ) : (
+                    <p className="mt-1 text-sm text-muted">
+                      Not stored for this server — reset to generate a copyable
+                      password.
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">No FTP account configured.</p>
+            )}
             <Button
-              className="mt-3"
               size="sm"
               variant="secondary"
-              onClick={() => action("reset-ftp-password")}
+              disabled={ftpResetBusy}
+              onClick={resetFtpPassword}
             >
-              Reset password
+              {ftpResetBusy ? "Resetting…" : "Reset password"}
             </Button>
           </Card>
           <Card className="md:col-span-2 space-y-3">
