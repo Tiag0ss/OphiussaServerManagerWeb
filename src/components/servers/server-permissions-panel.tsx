@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, Label, Select } from "@/components/ui/field";
+import { Card, Select } from "@/components/ui/field";
 
 type PermRow = {
   userId: string;

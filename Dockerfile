@@ -16,23 +16,25 @@ ENV PATH="/opt/steamcmd:${PATH}"
 WORKDIR /app
 ENV DATA_DIR=/data
 ENV NODE_ENV=production
+RUN corepack enable
 
 FROM base AS deps
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN NODE_ENV=development pnpm install --frozen-lockfile
 
 FROM base AS development
 ENV NODE_ENV=development
 # Lockfile + deps baked into the image; workspace bind-mount overlays source.
 # A named volume on /app/node_modules (see devcontainer.json) keeps Linux deps.
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 EXPOSE 3000 2121 2022
-CMD ["npm", "run", "dev"]
+CMD ["pnpm", "run", "dev"]
 
 FROM deps AS builder
+ENV NODE_ENV=production
 COPY . .
-RUN mkdir -p /data && npm run build
+RUN mkdir -p /data && pnpm run build
 
 FROM base AS production
 ENV NODE_ENV=production

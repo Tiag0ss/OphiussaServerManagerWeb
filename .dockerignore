@@ -10,8 +10,8 @@ data
 .vscode
 coverage
 npm-debug.log*
-pnpm-lock.yaml
-pnpm-workspace.yaml
+pnpm-debug.log*
+package-lock.json
 .env
 .env.local
 .env.*.local

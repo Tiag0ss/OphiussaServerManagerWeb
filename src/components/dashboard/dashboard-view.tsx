@@ -161,7 +161,10 @@ export function DashboardView() {
 
   const running = snapshot?.aggregate.running ?? 0;
   const total = snapshot?.aggregate.total ?? 0;
-  const servers = snapshot?.servers ?? [];
+  const servers = useMemo(
+    () => snapshot?.servers ?? [],
+    [snapshot?.servers],
+  );
   const heaviestId = useMemo(
     () => findHeaviestServerId(servers, serverHistories),
     [servers, serverHistories],

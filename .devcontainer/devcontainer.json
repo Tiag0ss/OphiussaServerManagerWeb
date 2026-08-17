@@ -25,8 +25,8 @@
     "NODE_ENV": "development",
     "OPHIUSSA_DIST_DIR": "/tmp/ophiussa-next"
   },
-  "postCreateCommand": "bash -lc 'set -e; ls -la package.json package-lock.json; if [ -f package-lock.json ]; then npm ci; else npm install; fi; mkdir -p /data/servers /data/backups /data/logs /tmp/ophiussa-next'",
-  "postStartCommand": "bash -lc 'test -d node_modules/next || npm ci || npm install; mkdir -p /data/servers /data/backups /data/logs /tmp/ophiussa-next'",
+  "postCreateCommand": "bash -lc 'set -e; corepack enable; pnpm install --frozen-lockfile; mkdir -p /data/servers /data/backups /data/logs /tmp/ophiussa-next'",
+  "postStartCommand": "bash -lc 'corepack enable; test -d node_modules/next || pnpm install --frozen-lockfile; mkdir -p /data/servers /data/backups /data/logs /tmp/ophiussa-next'",
   "customizations": {
     "vscode": {
       "extensions": [

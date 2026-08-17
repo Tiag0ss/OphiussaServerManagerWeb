@@ -2,6 +2,7 @@
   "name": "ophiussa-server-manager",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:clean": "pkill -f 'next dev' 2>/dev/null || true; next dev --turbopack",
@@ -37,7 +38,8 @@
     "tar": "^7.5.22",
     "uuid": "^14.0.1",
     "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "nodemailer": "^9.0.5"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
@@ -56,7 +58,6 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "15.5.23",
-    "nodemailer": "^9.0.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

@@ -23,8 +23,10 @@ export function CopyJoinButton({
   async function copy(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
+    const text = address;
+    if (!text) return;
     try {
-      await navigator.clipboard.writeText(address);
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
