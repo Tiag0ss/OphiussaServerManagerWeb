@@ -58,11 +58,26 @@ function listBackupEntries(dataDir: string, tpl: GameTemplate | null) {
       });
   }
 
-  // No template paths: archive top-level entries except binaries/caches
   if (!existsSync(dataDir)) return [];
   return readdirSync(dataDir).filter(
     (name) => !shouldExclude(name, exclude) && name !== "backups",
   );
+}
+
+function slugify(name: string) {
+  return (
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48) || "server"
+  );
+}
+
+function backupLabel(serverName: string, at: Date) {
+  const ts = at.toISOString().replace(/[:.]/g, "-").replace(/Z$/, "");
+  return `${slugify(serverName)}-${ts}.tar.gz`;
 }
 
 export async function createServerBackup(serverId: string) {
@@ -79,7 +94,7 @@ export async function createServerBackup(serverId: string) {
         await sendRcon(serverId, tpl.rcon.saveCommand);
         await new Promise((r) => setTimeout(r, 2000));
       } catch {
-        /* ignore — best-effort flush */
+        /* ignore */
       }
     }
 
@@ -90,14 +105,17 @@ export async function createServerBackup(serverId: string) {
     const dir = serverBackupDir(serverId);
     mkdirSync(dir, { recursive: true });
     const id = nanoid();
-    const filename = `${id}.tar.gz`;
-    const outPath = path.join(dir, filename);
+    const createdAt = new Date();
+    const label = backupLabel(server.name, createdAt);
+    const outPath = path.join(dir, label);
     const dataDir = serverDataDir(serverId);
     mkdirSync(dataDir, { recursive: true });
 
     const entries = listBackupEntries(dataDir, tpl);
     if (entries.length === 0) {
-      if (wasRunning && stopForBackup) await startServer(serverId).catch(() => undefined);
+      if (wasRunning && stopForBackup) {
+        await startServer(serverId).catch(() => undefined);
+      }
       throw new Error(
         "Nothing to back up — no save/config paths found for this template",
       );
@@ -119,9 +137,10 @@ export async function createServerBackup(serverId: string) {
       .values({
         id,
         serverId,
+        label,
         path: outPath,
         sizeBytes: size,
-        createdAt: new Date(),
+        createdAt,
       })
       .run();
 
@@ -133,6 +152,7 @@ export async function createServerBackup(serverId: string) {
 
     return {
       id,
+      label,
       path: outPath,
       sizeBytes: size,
       entries,

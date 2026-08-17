@@ -6,6 +6,21 @@ import type { GameTemplate } from "@/lib/templates/types";
 import { TemplateForm } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
+import { SecretInput } from "@/components/ui/secret-input";
+
+function modsLabel(t: GameTemplate) {
+  const p = t.mods?.providers || [];
+  if (!p.length) return "No mod providers";
+  return p
+    .map((x) =>
+      x === "steam-workshop"
+        ? "Steam Workshop"
+        : x === "thunderstore"
+          ? "Thunderstore"
+          : "CurseForge",
+    )
+    .join(" · ");
+}
 
 export default function NewServerPage() {
   const router = useRouter();
@@ -15,6 +30,8 @@ export default function NewServerPage() {
   const [name, setName] = useState("");
   const [password, setPassword] = useState("changeme");
   const [config, setConfig] = useState<Record<string, unknown>>({});
+  const [ports, setPorts] = useState<Record<string, number>>({});
+  const [portRange, setPortRange] = useState({ start: 25565, end: 26000 });
   const [showAdvanced, setShowAdvanced] = useState(true);
   const [error, setError] = useState("");
   const [ftpCreds, setFtpCreds] = useState<{ user: string; pass: string } | null>(
@@ -29,6 +46,17 @@ export default function NewServerPage() {
       .then((r) => r.json())
       .then((d) => setTemplates(d.templates || []));
   }, []);
+
+  useEffect(() => {
+    if (!templateId) return;
+    fetch(`/api/me?templateId=${encodeURIComponent(templateId)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.portRange) setPortRange(d.portRange);
+        if (d.suggestedPorts) setPorts(d.suggestedPorts);
+      })
+      .catch(() => undefined);
+  }, [templateId]);
 
   useEffect(() => {
     if (!template) return;
@@ -59,6 +87,7 @@ export default function NewServerPage() {
         name,
         templateId,
         config,
+        ports,
         start: true,
       }),
     });
@@ -75,7 +104,7 @@ export default function NewServerPage() {
     setTimeout(() => {
       router.push(`/servers/${data.id}`);
       router.refresh();
-    }, ftpCreds || data.ftpUsername ? 2500 : 0);
+    }, data.ftpUsername ? 2500 : 0);
   }
 
   return (
@@ -83,7 +112,7 @@ export default function NewServerPage() {
       <div>
         <h2 className="text-2xl font-semibold">Create server</h2>
         <p className="text-sm text-muted">
-          Step {step} of 3 — game, basics, then create
+          Step {step} of 3 — game, ports & basics, then config
         </p>
       </div>
 
@@ -102,6 +131,7 @@ export default function NewServerPage() {
             >
               <h3 className="font-semibold">{t.name}</h3>
               <p className="mt-1 text-sm text-muted">{t.description}</p>
+              <p className="mt-2 text-xs text-accent">{modsLabel(t)}</p>
             </button>
           ))}
         </div>
@@ -115,16 +145,41 @@ export default function NewServerPage() {
           </div>
           <div>
             <Label>Join password</Label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <SecretInput value={password} onChange={setPassword} />
           </div>
-          <p className="text-sm text-muted">
-            Ports, RAM and image defaults come from the{" "}
-            <strong>{template.name}</strong> template.
-          </p>
+          <div>
+            <Label>
+              Host ports{" "}
+              <span className="font-normal text-muted">
+                (allowed {portRange.start}–{portRange.end})
+              </span>
+            </Label>
+            <p className="mb-2 text-xs text-muted">
+              Consecutive ports are suggested automatically. Change them within
+              your allowed range.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {template.runtime.ports.map((p) => (
+                <div key={p.key}>
+                  <Label className="text-xs">
+                    {p.key} → container {p.container}/{p.protocol}
+                  </Label>
+                  <Input
+                    type="number"
+                    min={portRange.start}
+                    max={portRange.end}
+                    value={ports[p.key] ?? ""}
+                    onChange={(e) =>
+                      setPorts((prev) => ({
+                        ...prev,
+                        [p.key]: Number(e.target.value),
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setStep(1)}>
               Back

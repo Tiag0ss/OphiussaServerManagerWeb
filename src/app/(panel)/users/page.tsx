@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label, Select } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
+import { MultiSelect } from "@/components/ui/multi-select";
+import { SecretInput } from "@/components/ui/secret-input";
 
 type UserRow = {
   id: string;
@@ -13,38 +15,13 @@ type UserRow = {
   maxServers: number;
   maxMemoryMb: number;
   maxCpu: number;
+  portRangeStart: number | null;
+  portRangeEnd: number | null;
   allowedTemplates: string[];
   usage: { servers: number; memoryMb: number; cpu: number };
 };
 
 type TemplateOpt = { id: string; name: string };
-
-function TemplateCheckboxes({
-  templates,
-  selected,
-}: {
-  templates: TemplateOpt[];
-  selected?: string[];
-}) {
-  return (
-    <div className="mt-2 flex flex-wrap gap-3 text-sm">
-      {templates.map((t) => (
-        <label key={t.id} className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            name="allowedTemplates"
-            value={t.id}
-            defaultChecked={selected?.includes(t.id)}
-          />
-          {t.name}
-        </label>
-      ))}
-      {templates.length === 0 && (
-        <p className="text-muted">No templates installed</p>
-      )}
-    </div>
-  );
-}
 
 export default function UsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -57,6 +34,8 @@ export default function UsersPage() {
   const [grantOpen, setGrantOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [createAllowed, setCreateAllowed] = useState<string[]>([]);
+  const [editAllowed, setEditAllowed] = useState<string[]>([]);
 
   async function reload() {
     const [u, s, t] = await Promise.all([
@@ -83,7 +62,6 @@ export default function UsersPage() {
     e.preventDefault();
     setBusy(true);
     const fd = new FormData(e.currentTarget);
-    const allowed = fd.getAll("allowedTemplates").map(String);
     const res = await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -95,7 +73,9 @@ export default function UsersPage() {
         maxServers: Number(fd.get("maxServers")),
         maxMemoryMb: Number(fd.get("maxMemoryMb")),
         maxCpu: Number(fd.get("maxCpu")),
-        allowedTemplates: allowed,
+        portRangeStart: Number(fd.get("portRangeStart") || 0),
+        portRangeEnd: Number(fd.get("portRangeEnd") || 0),
+        allowedTemplates: createAllowed,
       }),
     });
     setBusy(false);
@@ -105,6 +85,7 @@ export default function UsersPage() {
       return;
     }
     setCreateOpen(false);
+    setCreateAllowed([]);
     setMessage("User created");
     reload();
   }
@@ -114,7 +95,6 @@ export default function UsersPage() {
     if (!editing) return;
     setBusy(true);
     const fd = new FormData(e.currentTarget);
-    const allowed = fd.getAll("allowedTemplates").map(String);
     const res = await fetch("/api/users", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -125,7 +105,9 @@ export default function UsersPage() {
         maxServers: Number(fd.get("maxServers")),
         maxMemoryMb: Number(fd.get("maxMemoryMb")),
         maxCpu: Number(fd.get("maxCpu")),
-        allowedTemplates: allowed,
+        portRangeStart: Number(fd.get("portRangeStart") || 0),
+        portRangeEnd: Number(fd.get("portRangeEnd") || 0),
+        allowedTemplates: editAllowed,
         password: fd.get("password") || undefined,
       }),
     });
@@ -170,14 +152,21 @@ export default function UsersPage() {
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">Users & quotas</h2>
           <p className="text-sm text-muted">
-            Accounts, RAM/CPU/server limits, and which templates each user may use
+            Accounts, RAM/CPU/server limits, port ranges, and templates
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => setGrantOpen(true)}>
             Grant access
           </Button>
-          <Button onClick={() => setCreateOpen(true)}>Add user</Button>
+          <Button
+            onClick={() => {
+              setCreateAllowed([]);
+              setCreateOpen(true);
+            }}
+          >
+            Add user
+          </Button>
         </div>
       </div>
 
@@ -189,7 +178,7 @@ export default function UsersPage() {
 
       <Card>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-[860px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-muted">
               <tr>
                 <th className="pb-2 pr-3 font-medium">User</th>
@@ -197,6 +186,7 @@ export default function UsersPage() {
                 <th className="pb-2 pr-3 font-medium">Servers</th>
                 <th className="pb-2 pr-3 font-medium">RAM</th>
                 <th className="pb-2 pr-3 font-medium">CPU</th>
+                <th className="pb-2 pr-3 font-medium">Ports</th>
                 <th className="pb-2 pr-3 font-medium">Templates</th>
                 <th className="pb-2 font-medium">Actions</th>
               </tr>
@@ -220,6 +210,11 @@ export default function UsersPage() {
                   <td className="py-3 pr-3">
                     {u.usage.cpu} / {u.maxCpu}
                   </td>
+                  <td className="py-3 pr-3 text-xs">
+                    {u.portRangeStart && u.portRangeEnd
+                      ? `${u.portRangeStart}–${u.portRangeEnd}`
+                      : "Global"}
+                  </td>
                   <td className="py-3 pr-3 text-xs text-muted">
                     {u.allowedTemplates.length === 0
                       ? "All"
@@ -230,7 +225,10 @@ export default function UsersPage() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => setEditing(u)}
+                        onClick={() => {
+                          setEditing(u);
+                          setEditAllowed(u.allowedTemplates);
+                        }}
                       >
                         Edit
                       </Button>
@@ -257,7 +255,7 @@ export default function UsersPage() {
               ))}
               {users.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-muted">
+                  <td colSpan={8} className="py-8 text-center text-muted">
                     No users yet
                   </td>
                 </tr>
@@ -270,7 +268,7 @@ export default function UsersPage() {
       <Modal
         open={createOpen}
         title="Add user"
-        description="Set account credentials and resource quotas"
+        description="Set credentials, quotas and allowed port range"
         onClose={() => setCreateOpen(false)}
         wide
       >
@@ -285,7 +283,7 @@ export default function UsersPage() {
           </div>
           <div>
             <Label>Password</Label>
-            <Input name="password" type="password" required minLength={8} />
+            <SecretInput name="password" required />
           </div>
           <div>
             <Label>Role</Label>
@@ -317,9 +315,21 @@ export default function UsersPage() {
               defaultValue={4}
             />
           </div>
+          <div>
+            <Label>Port range start (0 = panel global)</Label>
+            <Input name="portRangeStart" type="number" min={0} defaultValue={0} />
+          </div>
+          <div>
+            <Label>Port range end (0 = panel global)</Label>
+            <Input name="portRangeEnd" type="number" min={0} defaultValue={0} />
+          </div>
           <div className="md:col-span-2">
-            <Label>Allowed templates (empty = all)</Label>
-            <TemplateCheckboxes templates={templates} />
+            <Label>Allowed templates</Label>
+            <MultiSelect
+              options={templates}
+              value={createAllowed}
+              onChange={setCreateAllowed}
+            />
           </div>
           <div className="flex justify-end gap-2 md:col-span-2">
             <Button
@@ -339,7 +349,7 @@ export default function UsersPage() {
       <Modal
         open={!!editing}
         title={editing ? `Edit ${editing.email}` : "Edit user"}
-        description="Update quotas, role, or password"
+        description="Update quotas, port range, role, or password"
         onClose={() => setEditing(null)}
         wide
       >
@@ -390,13 +400,32 @@ export default function UsersPage() {
             </div>
             <div>
               <Label>New password (optional)</Label>
-              <Input name="password" type="password" minLength={8} />
+              <SecretInput name="password" />
+            </div>
+            <div>
+              <Label>Port range start (0 = global)</Label>
+              <Input
+                name="portRangeStart"
+                type="number"
+                min={0}
+                defaultValue={editing.portRangeStart || 0}
+              />
+            </div>
+            <div>
+              <Label>Port range end (0 = global)</Label>
+              <Input
+                name="portRangeEnd"
+                type="number"
+                min={0}
+                defaultValue={editing.portRangeEnd || 0}
+              />
             </div>
             <div className="md:col-span-2">
-              <Label>Allowed templates (empty = all)</Label>
-              <TemplateCheckboxes
-                templates={templates}
-                selected={editing.allowedTemplates}
+              <Label>Allowed templates</Label>
+              <MultiSelect
+                options={templates}
+                value={editAllowed}
+                onChange={setEditAllowed}
               />
             </div>
             <div className="flex justify-end gap-2 md:col-span-2">

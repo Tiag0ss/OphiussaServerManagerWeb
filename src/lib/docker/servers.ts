@@ -44,40 +44,64 @@ function timeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> 
   });
 }
 
-export async function allocatePorts(tpl: GameTemplate, serverId: string) {
+export async function allocatePorts(
+  tpl: GameTemplate,
+  serverId: string,
+  opts?: {
+    ownerId?: string;
+    preferred?: Record<string, number>;
+  },
+) {
   const db = getDb();
-  const settings = getSettings();
-  const used = new Set(
-    db
-      .select()
-      .from(allocations)
-      .all()
-      .map((a) => a.hostPort),
-  );
-  let next = settings.portRangeStart;
+  const server =
+    opts?.ownerId
+      ? null
+      : db.select().from(servers).where(eq(servers.id, serverId)).get();
+  const ownerId = opts?.ownerId || server?.ownerId;
+  if (!ownerId) throw new Error("Server owner required for port allocation");
+
+  const {
+    getUserPortRange,
+    getUsedHostPorts,
+    resolveHostPorts,
+  } = await import("../port-alloc");
+
+  const range = getUserPortRange(ownerId);
+  const used = getUsedHostPorts(serverId);
+  const resolved = resolveHostPorts(tpl, range, used, opts?.preferred);
   const created = [];
 
-  for (const port of tpl.runtime.ports) {
-    while (used.has(next) || next > settings.portRangeEnd) {
-      if (next > settings.portRangeEnd) {
-        throw new Error("No free ports in configured range");
-      }
-      next++;
-    }
+  for (const p of resolved) {
     const row = {
       id: nanoid(),
       serverId,
-      hostPort: next,
-      containerPort: port.container,
-      protocol: port.protocol,
-      key: port.key,
+      hostPort: p.hostPort,
+      containerPort: p.container,
+      protocol: p.protocol,
+      key: p.key,
     };
     db.insert(allocations).values(row).run();
-    used.add(next);
     created.push(row);
-    next++;
   }
   return created;
+}
+
+/** Replace all allocations for a server (used when editing ports). */
+export async function reallocatePorts(
+  serverId: string,
+  preferred: Record<string, number>,
+) {
+  const db = getDb();
+  const server = db.select().from(servers).where(eq(servers.id, serverId)).get();
+  if (!server) throw new Error("Server not found");
+  const tpl = getTemplate(server.templateId);
+  if (!tpl) throw new Error("Template not found");
+
+  db.delete(allocations).where(eq(allocations.serverId, serverId)).run();
+  return allocatePorts(tpl, serverId, {
+    ownerId: server.ownerId,
+    preferred,
+  });
 }
 
 export async function createServerContainer(serverId: string) {

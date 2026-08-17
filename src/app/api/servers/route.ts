@@ -42,13 +42,15 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await requireSession();
   const body = await req.json();
-  const { name, templateId, config, memoryMb, cpuLimit, start } = body as {
+  const { name, templateId, config, memoryMb, cpuLimit, start, ports } = body as {
     name: string;
     templateId: string;
     config?: Record<string, unknown>;
     memoryMb?: number;
     cpuLimit?: number;
     start?: boolean;
+    /** Optional host port map: { game: 25565, query: 25566 } */
+    ports?: Record<string, number>;
   };
 
   if (!name || !templateId) {
@@ -118,6 +120,11 @@ export async function POST(req: Request) {
     .run();
 
   try {
+    const { allocatePorts } = await import("@/lib/docker/servers");
+    await allocatePorts(tpl, id, {
+      ownerId: user.id,
+      preferred: ports,
+    });
     await createServerContainer(id);
     if (start !== false) {
       await startServer(id);

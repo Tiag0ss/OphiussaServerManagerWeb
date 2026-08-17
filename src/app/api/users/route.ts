@@ -29,6 +29,8 @@ export async function GET() {
         maxServers: u.maxServers,
         maxMemoryMb: u.maxMemoryMb,
         maxCpu: u.maxCpu,
+        portRangeStart: u.portRangeStart || null,
+        portRangeEnd: u.portRangeEnd || null,
         allowedTemplates,
         usage,
         createdAt: u.createdAt,
@@ -55,6 +57,8 @@ export async function POST(req: Request) {
       maxServers: Number(body.maxServers ?? 3),
       maxMemoryMb: Number(body.maxMemoryMb ?? 8192),
       maxCpu: Number(body.maxCpu ?? 4),
+      portRangeStart: Number(body.portRangeStart ?? 0),
+      portRangeEnd: Number(body.portRangeEnd ?? 0),
       allowedTemplatesJson: JSON.stringify(allowed),
       createdAt: new Date(),
     })
@@ -119,6 +123,10 @@ export async function PUT(req: Request) {
     if (body.maxMemoryMb !== undefined)
       patch.maxMemoryMb = Number(body.maxMemoryMb);
     if (body.maxCpu !== undefined) patch.maxCpu = Number(body.maxCpu);
+    if (body.portRangeStart !== undefined)
+      patch.portRangeStart = Number(body.portRangeStart);
+    if (body.portRangeEnd !== undefined)
+      patch.portRangeEnd = Number(body.portRangeEnd);
     if (Array.isArray(body.allowedTemplates)) {
       patch.allowedTemplatesJson = JSON.stringify(body.allowedTemplates);
     }

@@ -11,6 +11,8 @@ const STATEMENTS = [
     max_memory_mb INTEGER NOT NULL DEFAULT 8192,
     max_cpu REAL NOT NULL DEFAULT 4,
     allowed_templates_json TEXT NOT NULL DEFAULT '[]',
+    port_range_start INTEGER NOT NULL DEFAULT 0,
+    port_range_end INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS settings (
@@ -74,6 +76,7 @@ const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS backups (
     id TEXT PRIMARY KEY,
     server_id TEXT NOT NULL REFERENCES servers(id) ON DELETE CASCADE,
+    label TEXT NOT NULL DEFAULT '',
     path TEXT NOT NULL,
     size_bytes INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL
@@ -94,7 +97,10 @@ const ALTERS = [
   `ALTER TABLE users ADD COLUMN max_memory_mb INTEGER NOT NULL DEFAULT 8192`,
   `ALTER TABLE users ADD COLUMN max_cpu REAL NOT NULL DEFAULT 4`,
   `ALTER TABLE users ADD COLUMN allowed_templates_json TEXT NOT NULL DEFAULT '[]'`,
+  `ALTER TABLE users ADD COLUMN port_range_start INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE users ADD COLUMN port_range_end INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE templates ADD COLUMN source TEXT NOT NULL DEFAULT 'builtin'`,
+  `ALTER TABLE backups ADD COLUMN label TEXT NOT NULL DEFAULT ''`,
 ];
 
 export function migrate(sqlite: Database.Database) {

@@ -21,6 +21,9 @@ export const users = sqliteTable("users", {
   maxCpu: real("max_cpu").notNull().default(4),
   /** JSON array of template ids; empty = all templates */
   allowedTemplatesJson: text("allowed_templates_json").notNull().default("[]"),
+  /** User-specific host port range (0 = inherit panel global) */
+  portRangeStart: integer("port_range_start").notNull().default(0),
+  portRangeEnd: integer("port_range_end").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
@@ -116,6 +119,8 @@ export const backups = sqliteTable("backups", {
   serverId: text("server_id")
     .notNull()
     .references(() => servers.id, { onDelete: "cascade" }),
+  /** Display / download filename, e.g. my-server-2026-08-16T18-00-00.tar.gz */
+  label: text("label").notNull().default(""),
   path: text("path").notNull(),
   sizeBytes: integer("size_bytes").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),

@@ -30,13 +30,19 @@ type ServerPayload = {
     config: Record<string, unknown>;
   };
   template: GameTemplate;
-  ports: Array<{ key: string; hostPort: number; protocol: string }>;
+  ports: Array<{
+    key: string;
+    hostPort: number;
+    containerPort?: number;
+    protocol: string;
+  }>;
   stats: {
     cpuPercent: number;
     memoryMb: number;
     memoryLimitMb: number;
   } | null;
   quotas: QuotaHeadroom | null;
+  portRange?: { start: number; end: number };
   isAdmin?: boolean;
   publicIp: string;
   ftpPort?: number;
@@ -62,14 +68,21 @@ export default function ServerDetailPage() {
   const [command, setCommand] = useState("");
   const [memoryMb, setMemoryMb] = useState(2048);
   const [cpuLimit, setCpuLimit] = useState(1);
+  const [portDraft, setPortDraft] = useState<Record<string, number>>({});
   const [resourceBusy, setResourceBusy] = useState(false);
+  const [consoleRef, setConsoleRef] = useState<HTMLPreElement | null>(null);
   const [mods, setMods] = useState<Array<{ id: string; name: string; provider: string }>>([]);
   const [modQuery, setModQuery] = useState("");
   const [modResults, setModResults] = useState<
     Array<{ id: string; name: string; provider: string; summary?: string }>
   >([]);
   const [backups, setBackups] = useState<
-    Array<{ id: string; sizeBytes: number; createdAt: string }>
+    Array<{
+      id: string;
+      label?: string;
+      sizeBytes: number;
+      createdAt: string;
+    }>
   >([]);
   const [scheduleList, setScheduleList] = useState<
     Array<{ id: string; name: string; cron: string; action: string }>
@@ -85,6 +98,9 @@ export default function ServerDetailPage() {
     setConfig(json.server.config);
     setMemoryMb(json.server.memoryMb);
     setCpuLimit(json.server.cpuLimit);
+    const draft: Record<string, number> = {};
+    for (const p of json.ports || []) draft[p.key] = p.hostPort;
+    setPortDraft(draft);
   }, [id]);
 
   useEffect(() => {
@@ -106,6 +122,11 @@ export default function ServerDetailPage() {
     };
     return () => es.close();
   }, [tab, id]);
+
+  useEffect(() => {
+    if (!consoleRef) return;
+    consoleRef.scrollTop = consoleRef.scrollHeight;
+  }, [logs, consoleRef]);
 
   useEffect(() => {
     if (tab !== "mods") return;
@@ -273,15 +294,61 @@ export default function ServerDetailPage() {
 
       {tab === "overview" && (
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <h3 className="font-medium">Network</h3>
-            <ul className="mt-3 space-y-1 text-sm">
+          <Card className="space-y-3">
+            <div>
+              <h3 className="font-medium">Network / ports</h3>
+              <p className="text-sm text-muted">
+                Host ports
+                {data.portRange
+                  ? ` (allowed ${data.portRange.start}–${data.portRange.end})`
+                  : ""}
+                . Changing ports recreates the container.
+              </p>
+            </div>
+            <ul className="space-y-2 text-sm">
               {data.ports.map((p) => (
-                <li key={p.key}>
-                  {p.key}: {data.publicIp || "host"}:{p.hostPort}/{p.protocol}
+                <li key={p.key} className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-[5rem] font-medium">{p.key}</span>
+                  <span className="text-muted">
+                    {data.publicIp || "host"}:
+                  </span>
+                  <Input
+                    className="w-28"
+                    type="number"
+                    value={portDraft[p.key] ?? p.hostPort}
+                    onChange={(e) =>
+                      setPortDraft((prev) => ({
+                        ...prev,
+                        [p.key]: Number(e.target.value),
+                      }))
+                    }
+                  />
+                  <span className="text-xs text-muted">/{p.protocol}</span>
                 </li>
               ))}
             </ul>
+            <Button
+              size="sm"
+              disabled={resourceBusy}
+              onClick={async () => {
+                setResourceBusy(true);
+                setMessage("");
+                const res = await fetch(`/api/servers/${id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ ports: portDraft }),
+                });
+                const j = await res.json().catch(() => ({}));
+                setResourceBusy(false);
+                if (!res.ok) setMessage(j.error || "Port update failed");
+                else {
+                  setMessage("Ports updated — container recreated");
+                  load();
+                }
+              }}
+            >
+              Apply ports
+            </Button>
           </Card>
           <Card>
             <h3 className="font-medium">FTP / SFTP</h3>
@@ -399,7 +466,10 @@ export default function ServerDetailPage() {
 
       {tab === "console" && (
         <Card className="space-y-3">
-          <pre className="h-80 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-ok">
+          <pre
+            ref={setConsoleRef}
+            className="h-80 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-ok"
+          >
             {logs || "Waiting for logs…"}
           </pre>
           <form
@@ -431,6 +501,22 @@ export default function ServerDetailPage() {
       {tab === "mods" && (
         <div className="space-y-4">
           <Card>
+            <h3 className="font-medium">Mod sources</h3>
+            <p className="mt-1 text-sm text-muted">
+              {(data.template.mods?.providers || []).length
+                ? (data.template.mods?.providers || [])
+                    .map((p) =>
+                      p === "steam-workshop"
+                        ? "Steam Workshop (install by file ID works without Web API key)"
+                        : p === "thunderstore"
+                          ? "Thunderstore"
+                          : "CurseForge (API key in Settings)",
+                    )
+                    .join(" · ")
+                : "This template has no mod providers configured"}
+            </p>
+          </Card>
+          <Card>
             <h3 className="font-medium">Installed</h3>
             <ul className="mt-3 space-y-2 text-sm">
               {mods.map((m) => (
@@ -461,12 +547,16 @@ export default function ServerDetailPage() {
             </ul>
           </Card>
           <Card className="space-y-3">
-            <h3 className="font-medium">Search</h3>
+            <h3 className="font-medium">Search / install</h3>
+            <p className="text-xs text-muted">
+              For Steam Workshop without an API key, paste the numeric Workshop
+              file ID and search.
+            </p>
             <div className="flex gap-2">
               <Input
                 value={modQuery}
                 onChange={(e) => setModQuery(e.target.value)}
-                placeholder="Search mods"
+                placeholder="Search mods or Workshop file ID"
               />
               <Button
                 onClick={async () => {
@@ -480,6 +570,11 @@ export default function ServerDetailPage() {
                     all.push(...(j.results || []));
                   }
                   setModResults(all);
+                  if (!all.length) {
+                    setMessage(
+                      "No results — for Steam, try a numeric Workshop file ID",
+                    );
+                  }
                 }}
               >
                 Search
@@ -555,12 +650,24 @@ export default function ServerDetailPage() {
           </Button>
           <ul className="space-y-2 text-sm">
             {backups.map((b) => (
-              <li key={b.id} className="flex items-center justify-between">
-                <span>
-                  {new Date(b.createdAt).toLocaleString()} ·{" "}
-                  {Math.round(b.sizeBytes / 1024)} KB
+              <li key={b.id} className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate">
+                  <span className="font-medium">
+                    {b.label || `backup-${b.id}.tar.gz`}
+                  </span>
+                  <span className="text-muted">
+                    {" "}
+                    · {Math.round(b.sizeBytes / 1024)} KB ·{" "}
+                    {new Date(b.createdAt).toLocaleString()}
+                  </span>
                 </span>
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
+                  <a
+                    href={`/api/servers/${id}/backups/${b.id}/download`}
+                    className="inline-flex items-center rounded-lg border border-border bg-card-elevated px-2.5 py-1.5 text-sm hover:border-accent/40"
+                  >
+                    Download
+                  </a>
                   <Button
                     size="sm"
                     variant="secondary"

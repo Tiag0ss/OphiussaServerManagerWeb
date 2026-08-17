@@ -45,6 +45,8 @@ export async function GET(_req: Request, ctx: Ctx) {
   const headroomOwnerId =
     user.role === "admin" ? server.ownerId : user.id;
   const quotas = getQuotaHeadroom(headroomOwnerId, id);
+  const { getUserPortRange } = await import("@/lib/port-alloc");
+  const portRange = getUserPortRange(server.ownerId);
   return NextResponse.json({
     server: {
       ...server,
@@ -58,6 +60,7 @@ export async function GET(_req: Request, ctx: Ctx) {
     ports,
     stats,
     quotas,
+    portRange,
     isAdmin: user.role === "admin",
     publicIp: settings.publicIp,
     ftpPort: ftpPort(),
@@ -110,7 +113,24 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const resourcesChanged =
     (typeof body.memoryMb === "number" && body.memoryMb !== server.memoryMb) ||
     (typeof body.cpuLimit === "number" && body.cpuLimit !== server.cpuLimit);
-  const shouldRecreate = Boolean(body.recreate) || resourcesChanged;
+
+  let portsChanged = false;
+  if (body.ports && typeof body.ports === "object") {
+    const preferred = body.ports as Record<string, number>;
+    const { reallocatePorts } = await import("@/lib/docker/servers");
+    try {
+      await reallocatePorts(id, preferred);
+      portsChanged = true;
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Port allocation failed" },
+        { status: 400 },
+      );
+    }
+  }
+
+  const shouldRecreate =
+    Boolean(body.recreate) || resourcesChanged || portsChanged;
 
   db.update(servers).set(patch).where(eq(servers.id, id)).run();
 

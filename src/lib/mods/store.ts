@@ -93,8 +93,20 @@ export async function searchWorkshop(
 ): Promise<ModSearchResult[]> {
   const settings = getSettings();
   const key = settings.steamWebApiKey;
+  // No Web API key: allow numeric Workshop file ID install without search
   if (!key) {
-    // fallback: return empty with hint — IPublishedFileService needs a key
+    const id = query.trim();
+    if (/^\d{5,20}$/.test(id)) {
+      return [
+        {
+          id,
+          name: `Workshop item ${id}`,
+          summary:
+            "Install by Workshop file ID (no Steam Web API key configured for search)",
+          provider: "steam-workshop",
+        },
+      ];
+    }
     return [];
   }
   const body = new URLSearchParams({
@@ -104,11 +116,6 @@ export async function searchWorkshop(
     numperpage: "30",
     return_short_description: "true",
   });
-  const res = await fetch(
-    "https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/",
-    { method: "GET", headers: {}, body: undefined },
-  );
-  // Query via GET with params
   const url = `https://api.steampowered.com/IPublishedFileService/QueryFiles/v1/?${body}`;
   const res2 = await fetch(url);
   if (!res2.ok) throw new Error("Steam Workshop search failed");
@@ -122,7 +129,6 @@ export async function searchWorkshop(
       }>;
     };
   };
-  void res;
   return (json.response?.publishedfiledetails || []).map((f) => ({
     id: f.publishedfileid,
     name: f.title,

@@ -5,6 +5,7 @@ import type { GameTemplate, TemplateField } from "@/lib/templates/types";
 import { evaluateShowIf } from "@/lib/templates/show-if";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { SecretInput } from "@/components/ui/secret-input";
 
 type Props = {
   template: GameTemplate;
@@ -272,13 +273,22 @@ function FieldControl({
   return (
     <div>
       <Label>{field.label || field.key}</Label>
-      <Input
-        type={field.secret ? "password" : "text"}
-        placeholder={field.placeholder}
-        value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
-        required={field.required}
-      />
+      {field.secret ? (
+        <SecretInput
+          value={String(value ?? "")}
+          onChange={(v) => onChange(v)}
+          placeholder={field.placeholder}
+          required={field.required}
+        />
+      ) : (
+        <Input
+          type="text"
+          placeholder={field.placeholder}
+          value={String(value ?? "")}
+          onChange={(e) => onChange(e.target.value)}
+          required={field.required}
+        />
+      )}
       {field.description && (
         <p className="mt-1 text-xs text-muted">{field.description}</p>
       )}

@@ -10,6 +10,7 @@ type TplMeta = {
   description?: string;
   source?: string;
   updatedAt?: string;
+  mods?: { providers?: string[] };
 };
 
 export default function TemplatesPage() {
@@ -167,6 +168,20 @@ export default function TemplatesPage() {
                   <p className="text-xs text-muted">
                     {t.id} · {t.source || "builtin"}
                   </p>
+                  {t.mods?.providers?.length ? (
+                    <p className="mt-1 text-[11px] text-accent">
+                      Mods:{" "}
+                      {t.mods.providers
+                        .map((p) =>
+                          p === "steam-workshop"
+                            ? "Steam Workshop"
+                            : p === "thunderstore"
+                              ? "Thunderstore"
+                              : "CurseForge",
+                        )
+                        .join(", ")}
+                    </p>
+                  ) : null}
                 </button>
               </li>
             ))}
