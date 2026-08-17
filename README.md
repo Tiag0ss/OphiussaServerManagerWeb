@@ -4,12 +4,16 @@ Game server panel for a single Linux VPS. The panel runs as one Docker image; ea
 
 ## Features
 
-- Dynamic template forms (Valheim, V Rising, Palworld, ARK ASE)
-- Start / stop / restart / kill with graceful RCON save when available
-- File manager, embedded FTP + SFTP per server
-- Mod search/install: Thunderstore, CurseForge, Steam Workshop
-- Backups, schedules, users & permissions
-- Single image deploy (no Compose sidecars)
+- **Dashboard** — host & server metrics with persistent history, sparklines, sorting, health checks
+- **Templates** — Valheim, V Rising, Palworld, ARK ASE/ASA, Minecraft, Satisfactory, Conan Exiles, Core Keeper, Nightingale, Smalland, Dragonwilds, and more
+- **Server lifecycle** — start / stop / restart / kill, graceful RCON save, pull latest image, clone, import/export JSON
+- **Monitoring & alerts** — Discord, generic webhook, optional SMTP email; CPU/RAM/disk thresholds
+- **Access control** — users, quotas, per-server shared permissions
+- **Audit log** — panel actions recorded for admins
+- **Files** — web file browser, embedded FTP + SFTP per server
+- **Mods** — Thunderstore, CurseForge, Steam Workshop
+- **Backups & schedules** — local backups with retention; cron tasks
+- **Security** — session middleware, login rate limiting, admin-only settings
 
 ## Development (Dev Container)
 
@@ -22,6 +26,7 @@ Local without Dev Container:
 ```bash
 npm ci
 npm run dev
+npm test
 ```
 
 Data is stored in `./data` automatically. FTP uses port **2121** in development (port 21 needs root). In the production image, FTP binds to 21.
@@ -47,8 +52,32 @@ curl -fsSL https://raw.githubusercontent.com/Tiag0ss/OphiussaServerManager/main/
 - `-p 2022:2022` SFTP
 - mounts `/var/run/docker.sock` and `/opt/ophiussa/data`
 
-**Security:** mounting `docker.sock` is equivalent to root on the host. Keep the panel private (firewall / reverse proxy auth).
+## Security
+
+Mounting `docker.sock` is equivalent to root on the host. **Do not expose the panel publicly without protection.**
+
+Recommended production setup:
+
+1. Put **Caddy** or **Traefik** in front with HTTPS (Let's Encrypt).
+2. Restrict panel port 3000 with firewall — only the reverse proxy should reach it.
+3. Set a strong `AUTH_SECRET` in production (see `.env.example`).
+4. Login is rate-limited (10 attempts / 15 min per IP).
+5. Admin pages (Templates, Users, Settings, Audit) are hidden from regular users.
+
+Example Caddy snippet:
+
+```caddy
+panel.example.com {
+  reverse_proxy localhost:3000
+}
+```
 
 ## First run
 
 Open `http://<vps>:3000/setup`, create the admin account, set public IP and port range.
+
+Configure alerts under **Settings → Alerts** (Discord webhook, generic webhook, or SMTP).
+
+## Environment
+
+See `.env.example` for `AUTH_SECRET`, `DOCKER_SOCKET`, and network mode options.

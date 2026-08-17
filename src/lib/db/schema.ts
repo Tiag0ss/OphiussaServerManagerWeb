@@ -141,3 +141,29 @@ export const schedules = sqliteTable("schedules", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   lastRunAt: integer("last_run_at", { mode: "timestamp_ms" }),
 });
+
+export const metricSamples = sqliteTable("metric_samples", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  scope: text("scope", { enum: ["host", "server", "aggregate"] }).notNull(),
+  serverId: text("server_id"),
+  metric: text("metric").notNull(),
+  value: real("value").notNull(),
+  sampledAt: integer("sampled_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const auditLog = sqliteTable("audit_log", {
+  id: text("id").primaryKey(),
+  userId: text("user_id"),
+  userEmail: text("user_email"),
+  action: text("action").notNull(),
+  targetType: text("target_type"),
+  targetId: text("target_id"),
+  detailsJson: text("details_json").notNull().default("{}"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const alertState = sqliteTable("alert_state", {
+  key: text("key").primaryKey(),
+  lastFiredAt: integer("last_fired_at", { mode: "timestamp_ms" }).notNull(),
+  lastValue: text("last_value").notNull().default(""),
+});

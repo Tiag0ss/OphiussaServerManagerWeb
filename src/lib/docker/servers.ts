@@ -555,6 +555,39 @@ export async function getContainerStats(serverId: string) {
   }
 }
 
+export async function pullLatestImage(serverId: string) {
+  const db = getDb();
+  const server = db.select().from(servers).where(eq(servers.id, serverId)).get();
+  if (!server) throw new Error("Server not found");
+  const tpl = getTemplate(server.templateId);
+  if (!tpl) throw new Error("Template not found");
+  const docker = getDocker();
+  await new Promise<void>((resolve, reject) => {
+    docker.pull(tpl.runtime.image, (err: Error | null, stream: NodeJS.ReadableStream) => {
+      if (err) return reject(err);
+      docker.modem.followProgress(stream, (pullErr: Error | null) => {
+        if (pullErr) reject(pullErr);
+        else resolve();
+      });
+    });
+  });
+}
+
+export async function updateServerImage(serverId: string) {
+  return withServerLock(serverId, async () => {
+    await pullLatestImage(serverId);
+    await stopServer(serverId).catch(() => undefined);
+    await removeServerContainers(serverId);
+    const db = getDb();
+    db.update(servers)
+      .set({ containerId: null, status: "stopped", updatedAt: new Date() })
+      .where(eq(servers.id, serverId))
+      .run();
+    await createServerContainer(serverId);
+    await startServer(serverId);
+  });
+}
+
 export async function reconcileServers() {
   const db = getDb();
   const docker = getDocker();

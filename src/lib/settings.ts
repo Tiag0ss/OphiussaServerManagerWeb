@@ -15,6 +15,19 @@ export type PanelSettings = {
   steamWebApiKey: string;
   steamUsername: string;
   steamPassword: string;
+  alertWebhookUrl: string;
+  alertDiscordWebhook: string;
+  alertEmailEnabled: boolean;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFrom: string;
+  alertEmailTo: string;
+  alertCpuThreshold: number;
+  alertRamThreshold: number;
+  alertDiskThreshold: number;
+  metricsRetentionHours: number;
 };
 
 const DEFAULTS: PanelSettings = {
@@ -30,6 +43,19 @@ const DEFAULTS: PanelSettings = {
   steamWebApiKey: "",
   steamUsername: "",
   steamPassword: "",
+  alertWebhookUrl: "",
+  alertDiscordWebhook: "",
+  alertEmailEnabled: false,
+  smtpHost: "",
+  smtpPort: 587,
+  smtpUser: "",
+  smtpPass: "",
+  smtpFrom: "",
+  alertEmailTo: "",
+  alertCpuThreshold: 90,
+  alertRamThreshold: 90,
+  alertDiskThreshold: 90,
+  metricsRetentionHours: 168,
 };
 
 export function getSettings(): PanelSettings {
@@ -49,6 +75,21 @@ export function getSettings(): PanelSettings {
     steamWebApiKey: map.steamWebApiKey ?? "",
     steamUsername: map.steamUsername ?? "",
     steamPassword: map.steamPassword ?? "",
+    alertWebhookUrl: map.alertWebhookUrl ?? "",
+    alertDiscordWebhook: map.alertDiscordWebhook ?? "",
+    alertEmailEnabled: map.alertEmailEnabled === "true",
+    smtpHost: map.smtpHost ?? "",
+    smtpPort: Number(map.smtpPort ?? DEFAULTS.smtpPort),
+    smtpUser: map.smtpUser ?? "",
+    smtpPass: map.smtpPass ?? "",
+    smtpFrom: map.smtpFrom ?? "",
+    alertEmailTo: map.alertEmailTo ?? "",
+    alertCpuThreshold: Number(map.alertCpuThreshold ?? DEFAULTS.alertCpuThreshold),
+    alertRamThreshold: Number(map.alertRamThreshold ?? DEFAULTS.alertRamThreshold),
+    alertDiskThreshold: Number(map.alertDiskThreshold ?? DEFAULTS.alertDiskThreshold),
+    metricsRetentionHours: Number(
+      map.metricsRetentionHours ?? DEFAULTS.metricsRetentionHours,
+    ),
   };
 }
 

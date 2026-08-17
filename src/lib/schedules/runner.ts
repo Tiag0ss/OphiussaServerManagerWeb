@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { eq } from "drizzle-orm";
 import { getDb } from "../db";
-import { schedules } from "../db/schema";
+import { schedules, servers } from "../db/schema";
 import {
   createServerBackup,
   backupPanelDb,
@@ -53,6 +53,21 @@ export function refreshSchedules() {
             .run();
         } catch (e) {
           console.error(`[schedule ${row.id}]`, e);
+          if (row.action === "backup") {
+            const server = getDb()
+              .select()
+              .from(servers)
+              .where(eq(servers.id, row.serverId))
+              .get();
+            if (server) {
+              const { alertOnBackupFailure } = await import("../alerts/monitor");
+              await alertOnBackupFailure(
+                server.name,
+                server.id,
+                e instanceof Error ? e.message : String(e),
+              );
+            }
+          }
         }
       },
       { timezone: tz },

@@ -5,6 +5,7 @@ import { servers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { canAccessServer } from "@/lib/permissions";
 import { getContainerStats } from "@/lib/docker/servers";
+import { recordServerMetrics } from "@/lib/metrics-store";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export async function GET(_req: Request, ctx: Ctx) {
   }
   const stats =
     server.status === "running" ? await getContainerStats(id) : null;
+  if (stats) recordServerMetrics(id, stats);
   return NextResponse.json({
     at: Date.now(),
     status: server.status,

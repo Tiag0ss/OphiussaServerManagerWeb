@@ -83,6 +83,33 @@ export function DashboardView() {
     setRefreshSec(readRefreshSec());
   }, []);
 
+  useEffect(() => {
+    async function loadHistory() {
+      const loads: Array<{
+        scope: string;
+        metric: string;
+        set: (v: MetricPoint[]) => void;
+      }> = [
+        { scope: "host", metric: "cpu", set: setCpuSeries },
+        { scope: "host", metric: "ram", set: setRamSeries },
+        { scope: "host", metric: "disk", set: setDiskSeries },
+        { scope: "aggregate", metric: "cpu", set: setServersCpuSeries },
+        { scope: "aggregate", metric: "ram", set: setServersRamSeries },
+      ];
+      await Promise.all(
+        loads.map(async ({ scope, metric, set }) => {
+          const res = await fetch(
+            `/api/metrics/history?scope=${scope}&metric=${metric}&hours=24`,
+          );
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.series?.length) set(data.series);
+        }),
+      );
+    }
+    loadHistory();
+  }, []);
+
   const poll = useCallback(async () => {
     try {
       const res = await fetch("/api/dashboard/metrics", { cache: "no-store" });

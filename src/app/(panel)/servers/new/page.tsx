@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
 import { SecretInput } from "@/components/ui/secret-input";
 import { syncSharedHostPorts } from "@/lib/port-share";
+import { notifyServersChanged } from "@/lib/servers-changed";
 
 function modsLabel(t: GameTemplate) {
   const p = t.mods?.providers || [];
@@ -105,6 +106,7 @@ export default function NewServerPage() {
     }
     if (data.warning) setError(data.warning);
     setTimeout(() => {
+      notifyServersChanged();
       router.push(`/servers/${data.id}`);
       router.refresh();
     }, data.ftpUsername ? 2500 : 0);

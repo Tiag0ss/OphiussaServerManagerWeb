@@ -11,9 +11,13 @@ import { CopyJoinButton } from "@/components/copy-join-button";
 import { CopyTextButton } from "@/components/copy-text-button";
 import { joinAddress } from "@/lib/join-address";
 import { syncSharedHostPorts } from "@/lib/port-share";
+import { notifyServersChanged } from "@/lib/servers-changed";
 import type { GameTemplate } from "@/lib/templates/types";
 import { SecretInput } from "@/components/ui/secret-input";
 import { ServerMetricsPanel } from "@/components/servers/server-metrics";
+import { ServerHealthBadge } from "@/components/servers/server-health-badge";
+import { ServerPermissionsPanel } from "@/components/servers/server-permissions-panel";
+import { ServerTransferPanel } from "@/components/servers/server-transfer-panel";
 
 type QuotaHeadroom = {
   maxServers: number;
@@ -72,6 +76,7 @@ export default function ServerDetailPage() {
     | "mods"
     | "backups"
     | "schedules"
+    | "access"
     | "danger"
   >("overview");
   const [config, setConfig] = useState<Record<string, unknown>>({});
@@ -194,6 +199,9 @@ export default function ServerDetailPage() {
     } else {
       setMessage("Done");
       load();
+      if (["start", "stop", "kill", "restart", "update-image"].includes(act)) {
+        notifyServersChanged();
+      }
     }
   }
 
@@ -255,6 +263,7 @@ export default function ServerDetailPage() {
       setMessage(j.error || "Delete failed");
       return;
     }
+    notifyServersChanged();
     router.push("/dashboard");
     router.refresh();
   }
@@ -271,6 +280,7 @@ export default function ServerDetailPage() {
     "mods",
     "backups",
     "schedules",
+    "access",
     "danger",
   ] as const;
 
@@ -285,7 +295,10 @@ export default function ServerDetailPage() {
             / {data.server.name}
           </p>
           <h2 className="text-2xl font-semibold">{data.server.name}</h2>
-          <p className="text-sm text-muted">
+          <div className="mt-2">
+            <ServerHealthBadge serverId={id} />
+          </div>
+          <p className="mt-2 text-sm text-muted">
             {data.template.name}
             {data.ownerName ? ` · owner ${data.ownerName}` : ""} ·{" "}
             {data.server.status}
@@ -1035,7 +1048,11 @@ export default function ServerDetailPage() {
         </Card>
       )}
 
+      {tab === "access" && <ServerPermissionsPanel serverId={id} />}
+
       {tab === "danger" && (
+        <div className="space-y-4">
+          <ServerTransferPanel serverId={id} />
         <Card className="space-y-3 border-danger/40">
           <h3 className="font-medium text-danger">Delete server</h3>
           <p className="text-sm text-muted">
@@ -1051,6 +1068,7 @@ export default function ServerDetailPage() {
             Delete everything
           </Button>
         </Card>
+        </div>
       )}
     </div>
   );

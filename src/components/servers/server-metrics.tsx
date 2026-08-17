@@ -49,10 +49,27 @@ export function ServerMetricsPanel({
 
   useEffect(() => {
     if (status !== "running") return;
+    async function loadHistory() {
+      const cpuRes = await fetch(
+        `/api/metrics/history?scope=server&metric=cpu&serverId=${serverId}&hours=24`,
+      );
+      const ramRes = await fetch(
+        `/api/metrics/history?scope=server&metric=ram&serverId=${serverId}&hours=24`,
+      );
+      if (cpuRes.ok) {
+        const data = await cpuRes.json();
+        if (data.series?.length) setCpuSeries(data.series);
+      }
+      if (ramRes.ok) {
+        const data = await ramRes.json();
+        if (data.series?.length) setRamSeries(data.series);
+      }
+    }
+    loadHistory();
     poll();
     const id = setInterval(poll, refreshSec * 1000);
     return () => clearInterval(id);
-  }, [poll, refreshSec, status]);
+  }, [poll, refreshSec, status, serverId]);
 
   const ramMax = useMemo(
     () =>

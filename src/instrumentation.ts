@@ -11,6 +11,20 @@ export async function register() {
     const { resolveDockerSocket } = await import("./lib/docker/client");
     const sock = resolveDockerSocket();
 
+    const startBackgroundJobs = async () => {
+      const g = globalThis as {
+        __ophiussaAlertTimer?: ReturnType<typeof setInterval>;
+      };
+      if (!g.__ophiussaAlertTimer) {
+        const { runAlertMonitor } = await import("./lib/alerts/monitor");
+        const { pruneOldMetrics } = await import("./lib/metrics-store");
+        g.__ophiussaAlertTimer = setInterval(() => {
+          runAlertMonitor().catch((e) => console.error("[alerts]", e));
+          pruneOldMetrics();
+        }, 60_000);
+      }
+    };
+
     const startDockerSync = async () => {
       if (!existsSync(sock)) {
         console.warn(
@@ -38,6 +52,7 @@ export async function register() {
       await startFtpServer();
       startSftpServer();
       refreshSchedules();
+      await startBackgroundJobs();
     } else {
       try {
         await startDockerSync();
@@ -46,6 +61,7 @@ export async function register() {
         await startFtpServer();
         startSftpServer();
         refreshSchedules();
+        await startBackgroundJobs();
       } catch (e) {
         console.warn("[instrumentation] optional services:", e);
       }

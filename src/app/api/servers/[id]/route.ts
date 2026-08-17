@@ -10,8 +10,10 @@ import {
   startServer,
   stopServer,
   createServerContainer,
+  updateServerImage,
 } from "@/lib/docker/servers";
 import { canAccessServer } from "@/lib/permissions";
+import { writeAudit } from "@/lib/audit";
 import {
   assertCanUpdateServerResources,
   getQuotaHeadroom,
@@ -216,6 +218,11 @@ export async function DELETE(req: Request, ctx: Ctx) {
     );
   }
   await deleteServerWipe(id);
+  writeAudit(user, "server.delete", {
+    targetType: "server",
+    targetId: id,
+    details: { name: server.name },
+  });
   return NextResponse.json({ ok: true });
 }
 
@@ -232,19 +239,36 @@ export async function POST(req: Request, ctx: Ctx) {
       case "start":
         if (!canAccessServer(user, id, "start")) throw new Error("FORBIDDEN");
         await startServer(id);
+        writeAudit(user, "server.start", { targetType: "server", targetId: id });
         break;
       case "stop":
         if (!canAccessServer(user, id, "stop")) throw new Error("FORBIDDEN");
         await stopServer(id);
+        writeAudit(user, "server.stop", { targetType: "server", targetId: id });
         break;
       case "kill":
         if (!canAccessServer(user, id, "stop")) throw new Error("FORBIDDEN");
         await stopServer(id, { kill: true });
+        writeAudit(user, "server.stop", {
+          targetType: "server",
+          targetId: id,
+          details: { kill: true },
+        });
         break;
       case "restart":
         if (!canAccessServer(user, id, "start")) throw new Error("FORBIDDEN");
         await restartServer(id);
+        writeAudit(user, "server.restart", { targetType: "server", targetId: id });
         break;
+      case "update-image": {
+        if (!canAccessServer(user, id, "settings")) throw new Error("FORBIDDEN");
+        await updateServerImage(id);
+        writeAudit(user, "server.update_image", {
+          targetType: "server",
+          targetId: id,
+        });
+        break;
+      }
       case "reset-ftp-password": {
         if (
           !canAccessServer(user, id, "settings") &&

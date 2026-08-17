@@ -90,6 +90,32 @@ const STATEMENTS = [
     enabled INTEGER NOT NULL DEFAULT 1,
     last_run_at INTEGER
   )`,
+  `CREATE TABLE IF NOT EXISTS metric_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope TEXT NOT NULL,
+    server_id TEXT,
+    metric TEXT NOT NULL,
+    value REAL NOT NULL,
+    sampled_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_metric_samples_lookup
+    ON metric_samples(scope, server_id, metric, sampled_at)`,
+  `CREATE TABLE IF NOT EXISTS audit_log (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    user_email TEXT,
+    action TEXT NOT NULL,
+    target_type TEXT,
+    target_id TEXT,
+    details_json TEXT NOT NULL DEFAULT '{}',
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at)`,
+  `CREATE TABLE IF NOT EXISTS alert_state (
+    key TEXT PRIMARY KEY,
+    last_fired_at INTEGER NOT NULL,
+    last_value TEXT NOT NULL DEFAULT ''
+  )`,
 ];
 
 const ALTERS = [

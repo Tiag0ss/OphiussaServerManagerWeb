@@ -12,6 +12,7 @@ import {
 } from "@/lib/docker/servers";
 import { canAllocateMemory, hasDiskSpace } from "@/lib/host-metrics";
 import { listAccessibleServers } from "@/lib/permissions";
+import { writeAudit } from "@/lib/audit";
 import { assertCanCreateServer } from "@/lib/quotas";
 import {
   defaultConfigFromTemplate,
@@ -132,6 +133,11 @@ export async function POST(req: Request) {
       await startServer(id);
     }
   } catch (e) {
+    writeAudit(user, "server.create", {
+      targetType: "server",
+      targetId: id,
+      details: { partial: true },
+    });
     return NextResponse.json(
       {
         id,
@@ -142,6 +148,12 @@ export async function POST(req: Request) {
       { status: 201 },
     );
   }
+
+  writeAudit(user, "server.create", {
+    targetType: "server",
+    targetId: id,
+    details: { name, templateId },
+  });
 
   return NextResponse.json({
     id,

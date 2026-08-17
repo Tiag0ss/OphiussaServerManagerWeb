@@ -7,6 +7,11 @@ import { getDb } from "@/lib/db";
 import { allocations } from "@/lib/db/schema";
 import { getSettings } from "@/lib/settings";
 import { joinAddress } from "@/lib/join-address";
+import {
+  recordAggregateMetrics,
+  recordHostMetrics,
+  recordServerMetrics,
+} from "@/lib/metrics-store";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +56,18 @@ export async function GET() {
       serversCpu += s.stats.cpuPercent;
       serversMemoryMb += s.stats.memoryMb;
     }
+  }
+
+  recordHostMetrics(host);
+  recordAggregateMetrics({
+    serversCpu: Math.round(serversCpu * 10) / 10,
+    serversMemoryPercent:
+      host.ram.totalMb > 0
+        ? Math.round((serversMemoryMb / host.ram.totalMb) * 1000) / 10
+        : 0,
+  });
+  for (const s of enriched) {
+    if (s.stats) recordServerMetrics(s.id, s.stats);
   }
 
   return NextResponse.json({

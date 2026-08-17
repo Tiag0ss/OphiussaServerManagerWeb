@@ -1,8 +1,9 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { readRefreshSec } from "@/components/dashboard/metric-chart";
 import {
   resolveActiveLabel,
   SidebarBrand,
@@ -17,7 +18,7 @@ export type { NavServer };
 export function AppShell({
   children,
   user,
-  servers,
+  servers: initialServers,
   templateNames,
 }: {
   children: React.ReactNode;
@@ -28,6 +29,52 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [navOpen, setNavOpen] = useState(false);
+  const [servers, setServers] = useState(initialServers);
+  const isAdmin = user.role === "admin";
+
+  useEffect(() => {
+    setServers(initialServers);
+  }, [initialServers]);
+
+  const pollServers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/servers", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        servers: Array<{
+          id: string;
+          name: string;
+          templateId: string;
+          status: string;
+        }>;
+      };
+      setServers(
+        data.servers.map((s) => ({
+          id: s.id,
+          name: s.name,
+          templateId: s.templateId,
+          status: s.status,
+        })),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    pollServers();
+    const sec = readRefreshSec();
+    const id = setInterval(pollServers, sec * 1000);
+    return () => clearInterval(id);
+  }, [pollServers]);
+
+  useEffect(() => {
+    function onRefresh() {
+      pollServers();
+    }
+    window.addEventListener("ophiussa:servers-changed", onRefresh);
+    return () => window.removeEventListener("ophiussa:servers-changed", onRefresh);
+  }, [pollServers]);
 
   useEffect(() => {
     setNavOpen(false);
@@ -60,6 +107,7 @@ export function AppShell({
               pathname={pathname}
               servers={servers}
               templateNames={templateNames}
+              isAdmin={isAdmin}
               className="h-full"
             />
           </div>
@@ -126,6 +174,7 @@ export function AppShell({
                   pathname={pathname}
                   servers={servers}
                   templateNames={templateNames}
+                  isAdmin={isAdmin}
                   onNavigate={() => setNavOpen(false)}
                   className="h-full"
                 />

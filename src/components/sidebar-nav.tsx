@@ -5,11 +5,13 @@ import {
   FileStack,
   LayoutDashboard,
   LogOut,
+  ScrollText,
+  Search,
   Server,
   Settings,
   Users,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type NavServer = {
@@ -23,6 +25,7 @@ const adminLinks = [
   { href: "/templates", label: "Templates", icon: FileStack },
   { href: "/users", label: "Users", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/audit", label: "Audit log", icon: ScrollText },
 ] as const;
 
 function isPathActive(pathname: string, href: string): boolean {
@@ -231,17 +234,35 @@ export function SidebarNav({
   templateNames,
   onNavigate,
   className,
+  isAdmin = false,
 }: {
   pathname: string;
   servers: NavServer[];
   templateNames: Record<string, string>;
   onNavigate?: () => void;
   className?: string;
+  isAdmin?: boolean;
 }) {
+  const [query, setQuery] = useState("");
   const gameGroups = useMemo(
     () => groupServersByGame(servers, templateNames),
     [servers, templateNames],
   );
+
+  const filteredGroups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return gameGroups;
+    return gameGroups
+      .map((g) => ({
+        ...g,
+        servers: g.servers.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            g.label.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((g) => g.servers.length > 0 || g.label.toLowerCase().includes(q));
+  }, [gameGroups, query]);
 
   const activeServerId = pathname.match(/^\/servers\/([^/]+)/)?.[1];
 
@@ -258,12 +279,27 @@ export function SidebarNav({
       </div>
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden">
+        {servers.length > 0 && (
+          <div className="relative mb-3 px-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted/50" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search servers…"
+              className="w-full rounded-lg border border-border/70 bg-card/30 py-2 pl-8 pr-3 text-xs text-foreground placeholder:text-muted/50 focus:border-accent/40 focus:outline-none"
+            />
+          </div>
+        )}
+
         <div className="sidebar-scroll min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
-          {gameGroups.length === 0 && (
-            <p className="px-3 py-2 text-xs text-muted/60">No servers yet</p>
+          {filteredGroups.length === 0 && (
+            <p className="px-3 py-2 text-xs text-muted/60">
+              {query ? "No matches" : "No servers yet"}
+            </p>
           )}
 
-          {gameGroups.map((group) => {
+          {filteredGroups.map((group) => {
             const running = group.servers.filter(
               (s) => s.status === "running",
             ).length;
@@ -295,6 +331,7 @@ export function SidebarNav({
         </div>
       </div>
 
+      {isAdmin && (
       <div className="mt-3 shrink-0 border-t border-border/60 pt-3">
         <SectionLabel>Admin</SectionLabel>
         <div className="space-y-0.5">
@@ -310,6 +347,7 @@ export function SidebarNav({
           ))}
         </div>
       </div>
+      )}
     </nav>
   );
 }
