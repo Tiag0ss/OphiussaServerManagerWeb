@@ -1,85 +1,29 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Button } from "./ui/button";
+import { X } from "lucide-react";
+import {
+  resolveActiveLabel,
+  SidebarBrand,
+  SidebarNav,
+  SidebarUserFooter,
+  type NavServer,
+} from "@/components/sidebar-nav";
 import { cn } from "@/lib/utils";
 
-const links = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/servers", label: "Servers" },
-  { href: "/servers/new", label: "Create" },
-  { href: "/templates", label: "Templates" },
-  { href: "/users", label: "Users" },
-  { href: "/settings", label: "Settings" },
-];
-
-function NavLinks({
-  pathname,
-  onNavigate,
-  className,
-}: {
-  pathname: string;
-  onNavigate?: () => void;
-  className?: string;
-}) {
-  return (
-    <nav className={cn("space-y-1", className)}>
-      {links.map((l) => {
-        const active =
-          pathname === l.href ||
-          (l.href !== "/servers" && pathname.startsWith(l.href + "/")) ||
-          (l.href === "/servers" &&
-            pathname.startsWith("/servers/") &&
-            !pathname.startsWith("/servers/new"));
-        return (
-          <Link
-            key={l.href}
-            href={l.href}
-            onClick={onNavigate}
-            className={cn(
-              "block rounded-lg px-3 py-2.5 text-sm transition",
-              active
-                ? "bg-accent-soft text-accent"
-                : "text-muted hover:bg-card-elevated hover:text-foreground",
-            )}
-          >
-            {l.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
-function UserCard({
-  user,
-  onLogout,
-}: {
-  user: { name: string; email: string; role: string };
-  onLogout: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-border bg-card p-3.5 text-sm">
-      <p className="font-medium">{user.name}</p>
-      <p className="truncate text-xs text-muted">{user.email}</p>
-      <p className="mt-1 text-[10px] uppercase tracking-wider text-accent/80">
-        {user.role}
-      </p>
-      <Button className="mt-3 w-full" variant="secondary" size="sm" onClick={onLogout}>
-        Sign out
-      </Button>
-    </div>
-  );
-}
+export type { NavServer };
 
 export function AppShell({
   children,
   user,
+  servers,
+  templateNames,
 }: {
   children: React.ReactNode;
   user: { name: string; email: string; role: string };
+  servers: NavServer[];
+  templateNames: Record<string, string>;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -104,41 +48,35 @@ export function AppShell({
     router.refresh();
   }
 
-  const activeLabel =
-    links.find(
-      (l) =>
-        pathname === l.href ||
-        (l.href !== "/servers" && pathname.startsWith(l.href + "/")) ||
-        (l.href === "/servers" &&
-          pathname.startsWith("/servers/") &&
-          !pathname.startsWith("/servers/new")),
-    )?.label ?? "Panel";
+  const activeLabel = resolveActiveLabel(pathname, servers);
 
   return (
     <div className="flex min-h-dvh w-full">
-      <aside className="hidden w-60 shrink-0 border-r border-border bg-sidebar/80 md:flex md:flex-col">
-        <div className="sticky top-0 flex h-dvh flex-col gap-8 px-5 py-7">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-accent">
-              Ophiussa
-            </p>
-            <h1 className="mt-1 text-lg font-semibold tracking-tight">
-              Server Manager
-            </h1>
+      <aside className="hidden w-[264px] shrink-0 border-r border-border/80 bg-sidebar md:flex md:flex-col">
+        <div className="flex h-dvh flex-col px-4 py-5">
+          <SidebarBrand />
+          <div className="mt-7 min-h-0 flex-1">
+            <SidebarNav
+              pathname={pathname}
+              servers={servers}
+              templateNames={templateNames}
+              className="h-full"
+            />
           </div>
-          <NavLinks pathname={pathname} className="flex-1" />
-          <UserCard user={user} onLogout={logout} />
+          <div className="mt-4 shrink-0">
+            <SidebarUserFooter user={user} onLogout={logout} />
+          </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-sidebar/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-sidebar/80 md:hidden">
+        <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border/80 bg-sidebar/90 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-sidebar/75 md:hidden">
           <button
             type="button"
             aria-label="Open menu"
             aria-expanded={navOpen}
             onClick={() => setNavOpen(true)}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-card-elevated text-foreground"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border/80 bg-card/60 text-foreground"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
@@ -151,7 +89,7 @@ export function AppShell({
           </button>
           <div className="min-w-0 flex-1 text-center">
             <p className="truncate text-sm font-medium">{activeLabel}</p>
-            <p className="truncate text-[10px] uppercase tracking-wider text-muted">
+            <p className="truncate text-[10px] uppercase tracking-wider text-muted/60">
               Ophiussa
             </p>
           </div>
@@ -163,38 +101,37 @@ export function AppShell({
             <button
               type="button"
               aria-label="Close menu"
-              className="absolute inset-0 bg-black/60"
+              className="absolute inset-0 bg-black/70 backdrop-blur-[2px]"
               onClick={() => setNavOpen(false)}
             />
-            <aside className="absolute inset-y-0 left-0 flex w-[min(100vw-3rem,18rem)] flex-col gap-6 border-r border-border bg-sidebar px-5 py-6 shadow-xl">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-accent">
-                    Ophiussa
-                  </p>
-                  <h1 className="mt-1 text-lg font-semibold tracking-tight">
-                    Server Manager
-                  </h1>
-                </div>
+            <aside
+              className={cn(
+                "absolute inset-y-0 left-0 flex w-[min(100vw-2.5rem,280px)] flex-col",
+                "border-r border-border/80 bg-sidebar shadow-2xl shadow-black/40",
+              )}
+            >
+              <div className="flex items-center justify-between gap-3 px-4 pt-5">
+                <SidebarBrand />
                 <button
                   type="button"
                   aria-label="Close menu"
                   onClick={() => setNavOpen(false)}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card-elevated"
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-card/60 text-muted hover:text-foreground"
                 >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                    <path
-                      d="M6 6l12 12M18 6L6 18"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+                  <X className="size-4" strokeWidth={2} />
                 </button>
               </div>
-              <NavLinks pathname={pathname} onNavigate={() => setNavOpen(false)} />
-              <div className="mt-auto">
-                <UserCard user={user} onLogout={logout} />
+              <div className="mt-6 min-h-0 flex-1 px-4">
+                <SidebarNav
+                  pathname={pathname}
+                  servers={servers}
+                  templateNames={templateNames}
+                  onNavigate={() => setNavOpen(false)}
+                  className="h-full"
+                />
+              </div>
+              <div className="shrink-0 px-4 pb-5 pt-4">
+                <SidebarUserFooter user={user} onLogout={logout} />
               </div>
             </aside>
           </div>

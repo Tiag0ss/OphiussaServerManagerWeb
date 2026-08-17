@@ -13,6 +13,7 @@ import { joinAddress } from "@/lib/join-address";
 import { syncSharedHostPorts } from "@/lib/port-share";
 import type { GameTemplate } from "@/lib/templates/types";
 import { SecretInput } from "@/components/ui/secret-input";
+import { ServerMetricsPanel } from "@/components/servers/server-metrics";
 
 type QuotaHeadroom = {
   maxServers: number;
@@ -254,7 +255,7 @@ export default function ServerDetailPage() {
       setMessage(j.error || "Delete failed");
       return;
     }
-    router.push("/servers");
+    router.push("/dashboard");
     router.refresh();
   }
 
@@ -278,8 +279,8 @@ export default function ServerDetailPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted">
-            <Link href="/servers" className="hover:underline">
-              Servers
+            <Link href="/dashboard" className="hover:underline">
+              Dashboard
             </Link>{" "}
             / {data.server.name}
           </p>
@@ -350,7 +351,14 @@ export default function ServerDetailPage() {
       </div>
 
       {tab === "overview" && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4">
+          <ServerMetricsPanel
+            serverId={id}
+            status={data.server.status}
+            memoryLimitMb={data.stats?.memoryLimitMb ?? data.server.memoryMb}
+            cpuLimit={data.server.cpuLimit}
+          />
+          <div className="grid gap-4 md:grid-cols-2">
           <Card className="space-y-3">
             <div>
               <h3 className="font-medium">Network / ports</h3>
@@ -541,6 +549,7 @@ export default function ServerDetailPage() {
               </Button>
             </div>
           </Card>
+          </div>
         </div>
       )}
 
