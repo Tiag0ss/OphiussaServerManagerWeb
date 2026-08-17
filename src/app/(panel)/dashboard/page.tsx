@@ -33,7 +33,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Card>
           <p className="text-xs uppercase text-muted">RAM</p>
           <p className="mt-1 text-2xl font-semibold">

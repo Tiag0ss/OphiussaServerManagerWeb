@@ -26,16 +26,16 @@ export default async function ServersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold">Servers</h2>
+          <h2 className="text-xl font-semibold sm:text-2xl">Servers</h2>
           <p className="text-sm text-muted">All game instances on this VPS</p>
         </div>
-        <Link href="/servers/new">
-          <Button>Create server</Button>
+        <Link href="/servers/new" className="w-full sm:w-auto">
+          <Button className="w-full sm:w-auto">Create server</Button>
         </Link>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {servers.map((s) => {
           const address = joinAddress(publicIp, portsByServer.get(s.id) ?? []);
           return (

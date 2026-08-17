@@ -317,13 +317,13 @@ export default function ServerDetailPage() {
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
         {tabs.map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`rounded-md px-3 py-1.5 text-sm capitalize ${
+            className={`shrink-0 rounded-md px-3 py-1.5 text-sm capitalize ${
               tab === t
                 ? "bg-accent text-accent-fg"
                 : "bg-card-elevated text-muted"

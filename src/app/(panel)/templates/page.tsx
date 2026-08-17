@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, Label, Textarea } from "@/components/ui/field";
+import { Card, Label, Select, Textarea } from "@/components/ui/field";
 import { TemplateForm } from "@/components/template-form";
 import {
   defaultConfigFromTemplate,
@@ -29,6 +29,15 @@ export default function TemplatesPage() {
   const [previewConfig, setPreviewConfig] = useState<Record<string, unknown>>(
     {},
   );
+  const [wideLayout, setWideLayout] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setWideLayout(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   const preview = useMemo(() => {
     if (!yaml.trim()) {
@@ -148,21 +157,24 @@ export default function TemplatesPage() {
 
   const showYaml = tab === "yaml" || tab === "split";
   const showPreview = tab === "preview" || tab === "split";
+  const sideBySide = showYaml && showPreview && wideLayout;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Templates</h2>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 lg:gap-6">
+      <div className="flex shrink-0 flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Templates
+          </h2>
           <p className="text-sm text-muted">
             Game server blueprints — edit YAML and preview the config form
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={newBlank}>
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Button variant="secondary" onClick={newBlank} className="flex-1 sm:flex-none">
             New blank
           </Button>
-          <label className="inline-flex cursor-pointer">
+          <label className="inline-flex flex-1 cursor-pointer sm:flex-none">
             <input
               type="file"
               accept=".yaml,.yml,text/yaml"
@@ -173,7 +185,7 @@ export default function TemplatesPage() {
                 e.target.value = "";
               }}
             />
-            <span className="inline-flex h-9 items-center rounded-lg border border-border bg-card-elevated px-3.5 text-sm hover:border-accent/40">
+            <span className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-border bg-card-elevated px-3.5 text-sm hover:border-accent/40 sm:w-auto">
               Upload
             </span>
           </label>
@@ -181,13 +193,33 @@ export default function TemplatesPage() {
       </div>
 
       {message && (
-        <p className="rounded-lg border border-border bg-accent-soft px-3 py-2 text-sm text-accent">
+        <p className="shrink-0 rounded-lg border border-border bg-accent-soft px-3 py-2 text-sm text-accent">
           {message}
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-        <Card className="h-fit p-2">
+      {list.length > 0 && (
+        <div className="shrink-0 lg:hidden">
+          <Label>Template</Label>
+          <Select
+            value={selectedId ?? ""}
+            onChange={(e) => {
+              const id = e.target.value;
+              if (id) openEdit(id);
+            }}
+          >
+            <option value="">Select a template…</option>
+            {list.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.id})
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
+
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,260px)_1fr] lg:items-stretch">
+        <Card className="hidden h-fit max-h-[calc(100dvh-12rem)] overflow-y-auto p-2 lg:block">
           <ul className="space-y-0.5">
             {list.map((t) => (
               <li key={t.id}>
@@ -229,9 +261,9 @@ export default function TemplatesPage() {
           </ul>
         </Card>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <Label className="mb-0">
                 {selectedId ? `Editing ${selectedId}` : "New / paste YAML"}
               </Label>
@@ -239,21 +271,23 @@ export default function TemplatesPage() {
                 Saving marks the template as custom
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {(["yaml", "preview", "split"] as const).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  onClick={() => setTab(t)}
-                  className={`rounded-md px-3 py-1.5 text-sm capitalize ${
-                    tab === t
-                      ? "bg-accent text-accent-fg"
-                      : "bg-card-elevated text-muted"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex w-full gap-1 rounded-lg bg-card-elevated p-1 sm:w-auto">
+                {(["yaml", "preview", "split"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTab(t)}
+                    className={`flex-1 rounded-md px-3 py-1.5 text-sm capitalize sm:flex-none ${
+                      tab === t
+                        ? "bg-accent text-accent-fg"
+                        : "text-muted hover:text-foreground"
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
               {selectedId && (
                 <>
                   <Button
@@ -272,21 +306,25 @@ export default function TemplatesPage() {
                   </Button>
                 </>
               )}
-              <Button onClick={save} disabled={busy || !yaml.trim()}>
+              <Button
+                onClick={save}
+                disabled={busy || !yaml.trim()}
+                className="w-full sm:w-auto"
+              >
                 {busy ? "Saving…" : "Save"}
               </Button>
             </div>
           </div>
 
           <div
-            className={`grid gap-4 ${
-              showYaml && showPreview ? "xl:grid-cols-2" : ""
+            className={`grid min-h-0 flex-1 gap-4 ${
+              sideBySide ? "lg:grid-cols-2" : "grid-cols-1"
             }`}
           >
             {showYaml && (
-              <Card>
+              <Card className="flex min-h-[min(420px,calc(100dvh-14rem))] min-w-0 flex-1 flex-col p-3 sm:p-5 lg:min-h-[min(640px,calc(100dvh-10rem))]">
                 <Textarea
-                  className="min-h-[560px] font-mono text-xs"
+                  className="min-h-[320px] flex-1 resize-y font-mono text-xs sm:min-h-[380px]"
                   value={yaml}
                   onChange={(e) => setYaml(e.target.value)}
                   spellCheck={false}
@@ -295,7 +333,7 @@ export default function TemplatesPage() {
               </Card>
             )}
             {showPreview && (
-              <Card className="space-y-4">
+              <Card className="min-w-0 space-y-4 overflow-y-auto p-3 sm:p-5 lg:max-h-[calc(100dvh-10rem)]">
                 {preview.error ? (
                   <p className="text-sm text-danger">{preview.error}</p>
                 ) : !preview.tpl ? (
@@ -309,7 +347,7 @@ export default function TemplatesPage() {
                       <p className="text-sm text-muted">
                         {preview.tpl.description || preview.tpl.id}
                       </p>
-                      <p className="mt-1 font-mono text-xs text-muted">
+                      <p className="mt-1 break-all font-mono text-xs text-muted">
                         {preview.tpl.runtime.image}
                         {preview.tpl.runtime.ports?.length
                           ? ` · ${preview.tpl.runtime.ports

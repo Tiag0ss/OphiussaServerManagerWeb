@@ -29,7 +29,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto w-full max-w-none space-y-6 xl:max-w-4xl">
       <div>
         <h2 className="text-2xl font-semibold">Settings</h2>
         <p className="text-sm text-muted">Panel-wide configuration</p>

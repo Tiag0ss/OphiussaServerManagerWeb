@@ -110,7 +110,7 @@ export default function NewServerPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="w-full space-y-6">
       <div>
         <h2 className="text-2xl font-semibold">Create server</h2>
         <p className="text-sm text-muted">
