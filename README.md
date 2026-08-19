@@ -204,11 +204,11 @@ The Docker socket must be available to spawn game containers. FTP uses port **21
 ## Features
 
 - **Dashboard** — host & server metrics, history, sparklines, health checks
-- **Templates** — Valheim, V Rising, Palworld, ARK, Minecraft, Satisfactory, Conan Exiles, and more
+- **Templates** — Steam dedicated (generic App ID), Valheim, V Rising, Palworld, ARK, Minecraft, Satisfactory, Conan Exiles, and more
 - **Lifecycle** — start/stop/restart, RCON save, pull image, clone, import/export
 - **Monitoring** — Discord, webhook, email alerts; CPU/RAM/disk thresholds
 - **Access** — users, quotas, per-server permissions, audit log
-- **Files** — web browser, FTP + SFTP per server
+- **Files** — explorer-style browser (upload, download, copy/cut/paste), plus FTP + SFTP per server
 - **Mods** — Thunderstore, CurseForge, Steam Workshop
 - **Backups** — local backups with retention and cron schedules
 

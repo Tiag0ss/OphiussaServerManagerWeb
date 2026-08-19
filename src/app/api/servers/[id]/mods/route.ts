@@ -15,6 +15,7 @@ import {
   searchCurseforge,
   searchThunderstore,
   searchWorkshop,
+  workshopAppIdFor,
 } from "@/lib/mods/store";
 
 export const dynamic = "force-dynamic";
@@ -46,10 +47,27 @@ export async function GET(req: Request, ctx: Ctx) {
           results: await searchCurseforge(tpl.mods.curseforgeGameId, q),
         });
       }
-      if (provider === "steam-workshop" && tpl?.mods?.workshopAppId) {
-        return NextResponse.json({
-          results: await searchWorkshop(tpl.mods.workshopAppId, q),
-        });
+      if (provider === "steam-workshop") {
+        const appId = server ? workshopAppIdFor(server) : null;
+        if (appId) {
+          return NextResponse.json({
+            results: await searchWorkshop(appId, q),
+          });
+        }
+        const id = q.trim();
+        if (/^\d{5,20}$/.test(id)) {
+          return NextResponse.json({
+            results: [
+              {
+                id,
+                name: `Workshop item ${id}`,
+                summary: "Set Workshop client App ID in server config for search",
+                provider: "steam-workshop",
+              },
+            ],
+          });
+        }
+        return NextResponse.json({ results: [] });
       }
       return NextResponse.json({ results: [] });
     } catch (e) {

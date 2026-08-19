@@ -272,6 +272,14 @@ async function createServerContainerUnlocked(serverId: string) {
     // unless the template explicitly requests it (otherwise bootstrap fails with EPERM).
     envMap.PUID = String(settings.puid);
     envMap.PGID = String(settings.pgid);
+    envMap.UID = String(settings.puid);
+    envMap.GID = String(settings.pgid);
+    if (settings.steamUsername && !envMap.USERNAME) {
+      envMap.USERNAME = settings.steamUsername;
+    }
+    if (settings.steamPassword && !envMap.PASSWRD) {
+      envMap.PASSWRD = settings.steamPassword;
+    }
     if (applied.args.length) {
       envMap.ADDITIONAL_ARGS = applied.args.join(" ");
     }

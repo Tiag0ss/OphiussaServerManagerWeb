@@ -12,4 +12,14 @@ describe("template parsing", () => {
     expect(tpl.runtime.image).toBeTruthy();
     expect(tpl.runtime.ports.length).toBeGreaterThan(0);
   });
+
+  it("parses generic steam template yaml", () => {
+    const file = path.join(process.cwd(), "templates", "steam.yaml");
+    const raw = readFileSync(file, "utf8");
+    const tpl = parseTemplateYaml(raw);
+    expect(tpl.id).toBe("steam");
+    expect(tpl.runtime.image).toContain("steamcmd");
+    expect(tpl.fields.some((f) => f.key === "gameId")).toBe(true);
+    expect(tpl.mods?.providers).toContain("steam-workshop");
+  });
 });

@@ -1,0 +1,86 @@
+id: steam
+name: Steam Dedicated
+description: Generic SteamCMD / Source dedicated server — set the App ID, game folder and launch args (CS, TF2, GMod, L4D2, …). Steam credentials come from Settings.
+runtime:
+  image: ich777/steamcmd:latest
+  stopTimeout: 90
+  memoryMb: 4096
+  cpuLimit: 2
+  restartPolicy: unless-stopped
+  ports:
+    - { key: game, container: 27015, protocol: udp, listenEnv: GAME_PORT, matchHost: true }
+    - { key: gameTcp, container: 27015, protocol: tcp, matchHost: true }
+    - { key: query, container: 27016, protocol: udp }
+  volumes:
+    - { key: data, container: /serverdata }
+  env:
+    TZ: Europe/Lisbon
+  backup:
+    include:
+      - serverfiles
+    exclude:
+      - steamcmd
+      - steamapps
+      - serverfiles/steamapps
+      - serverfiles/bin
+      - serverfiles/bin32
+      - serverfiles/bin64
+mods:
+  providers: [steam-workshop]
+  installPath: serverfiles
+fields:
+  - key: gameId
+    type: string
+    group: Steam
+    label: Steam App ID
+    required: true
+    default: "232330"
+    placeholder: "232330"
+    description: Dedicated server App ID from SteamDB. Examples — CS:S 232330, TF2 232250, GMod 4020, L4D2 222860, HL2DM 232370. Beta branch — "232330 -beta YOURBRANCH".
+    bind: { env: GAME_ID }
+  - key: gameName
+    type: string
+    group: Steam
+    label: SRCDS game folder
+    required: true
+    default: cstrike
+    placeholder: cstrike
+    description: Folder name passed to srcds (-game). Examples — cstrike, tf, garrysmod, left4dead2, hl2mp, dod.
+    bind: { env: GAME_NAME }
+  - key: workshopAppId
+    type: string
+    group: Steam
+    label: Workshop client App ID
+    default: "240"
+    placeholder: "240"
+    description: Client App ID used to search/install Workshop items (often different from the dedicated server ID). Examples — CS:S 240, TF2 440, GMod 4000, L4D2 550.
+  - key: gameParams
+    type: text
+    group: Server
+    label: Launch parameters
+    default: "-secure +maxplayers 16 +map de_dust2"
+    description: Extra srcds args. Game port is set automatically from the allocated host port (GAME_PORT) — do not pass -port here.
+    bind: { env: GAME_PARAMS }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players (hint)
+    min: 1
+    max: 128
+    default: 16
+    description: Reminder only — also set +maxplayers in launch parameters.
+  - key: validate
+    type: boolean
+    group: Steam
+    label: Validate files on start
+    default: false
+    advanced: true
+    description: Slower startups. Enable after a corrupted download.
+    bind: { env: VALIDATE, trueFalse: true }
+  - key: timezone
+    type: string
+    group: Server
+    label: Timezone
+    default: Europe/Lisbon
+    advanced: true
+    bind: { env: TZ }

@@ -117,6 +117,25 @@ export async function searchCurseforge(
   }));
 }
 
+export function workshopAppIdFor(server: {
+  templateId: string;
+  configJson: string;
+}): number | null {
+  const tpl = getTemplate(server.templateId);
+  let config: Record<string, unknown> = {};
+  try {
+    config = JSON.parse(server.configJson) as Record<string, unknown>;
+  } catch {
+    config = {};
+  }
+  const fromConfig = Number(String(config.workshopAppId ?? "").split(/\s+/)[0]);
+  if (Number.isFinite(fromConfig) && fromConfig > 0) return fromConfig;
+  if (tpl?.mods?.workshopAppId) return tpl.mods.workshopAppId;
+  const fromGameId = Number(String(config.gameId ?? "").split(/\s+/)[0]);
+  if (Number.isFinite(fromGameId) && fromGameId > 0) return fromGameId;
+  return null;
+}
+
 export async function searchWorkshop(
   appId: number,
   query: string,
@@ -192,11 +211,11 @@ export async function installWorkshopMod(
   const server = db.select().from(servers).where(eq(servers.id, serverId)).get();
   if (!server) throw new Error("Server not found");
   const tpl = getTemplate(server.templateId);
-  const appId = tpl?.mods?.workshopAppId;
-  if (!appId) throw new Error("Template has no workshopAppId");
+  const appId = workshopAppIdFor(server);
+  if (!appId) throw new Error("Set a Workshop client App ID on the server config");
 
   const settings = getSettings();
-  const installRoot = path.join(serverDataDir(serverId), tpl.mods?.installPath || "mods");
+  const installRoot = path.join(serverDataDir(serverId), tpl?.mods?.installPath || "mods");
   mkdirSync(installRoot, { recursive: true });
 
   const login =

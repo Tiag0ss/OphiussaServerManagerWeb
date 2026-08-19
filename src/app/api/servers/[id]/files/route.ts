@@ -17,6 +17,17 @@ export async function GET(req: Request, ctx: Ctx) {
   const path = url.searchParams.get("path") || ".";
   const mode = url.searchParams.get("mode") || "list";
   try {
+    if (mode === "download") {
+      const file = files.readBinary(id, path);
+      const safe = file.name.replace(/[\r\n"]/g, "_");
+      return new NextResponse(new Uint8Array(file.data), {
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Content-Disposition": `attachment; filename="${safe}"`,
+          "Cache-Control": "no-store",
+        },
+      });
+    }
     if (mode === "read") {
       return NextResponse.json({ content: files.readFile(id, path), path });
     }
@@ -60,6 +71,10 @@ export async function PUT(req: Request, ctx: Ctx) {
       files.mkdir(id, body.path);
     } else if (body.action === "rename") {
       files.renamePath(id, body.from, body.to);
+    } else if (body.action === "copy") {
+      const dest = files.uniqueDest(id, body.to);
+      files.copyPath(id, body.from, dest);
+      return NextResponse.json({ ok: true, path: dest });
     } else {
       files.writeFile(id, body.path, body.content ?? "");
     }
