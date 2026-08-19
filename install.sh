@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE="${OPHIUSSA_IMAGE:-tiag0ss/ophiussa-server-manager:latest}"
+IMAGE="${OPHIUSSA_IMAGE:-}"
 DATA_DIR="${OPHIUSSA_DATA_DIR:-/opt/ophiussa/data}"
 NAME="${OPHIUSSA_CONTAINER_NAME:-ophiussa}"
 HTTP_PORT="${OPHIUSSA_HTTP_PORT:-3000}"
@@ -10,6 +10,12 @@ SFTP_PORT="${OPHIUSSA_SFTP_PORT:-2022}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required. Install Docker first." >&2
+  exit 1
+fi
+
+if [ -z "$IMAGE" ]; then
+  echo "Set OPHIUSSA_IMAGE to your Docker image, e.g.:" >&2
+  echo "  OPHIUSSA_IMAGE=myuser/ophiussa-server-manager:latest ./install.sh" >&2
   exit 1
 fi
 

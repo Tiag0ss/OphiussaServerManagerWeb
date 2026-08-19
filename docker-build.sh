@@ -8,7 +8,7 @@
 # Example: ./docker-build.sh 0.1.0
 #
 # Optional env:
-#   DOCKER_USERNAME=tiag0ss   (default if unset: prompt)
+#   DOCKER_USERNAME=myuser   (required — prompted if unset)
 # ==============================================================================
 
 set -e
@@ -65,8 +65,7 @@ if [[ "$(pwd)" == /run/media/* ]] || [[ "$FS_TYPE" == ntfs* ]] || [[ "$FS_TYPE" 
 fi
 
 if [ -z "$DOCKER_USERNAME" ]; then
-    read -p "Enter your Docker Hub username [tiag0ss]: " DOCKER_USERNAME
-    DOCKER_USERNAME="${DOCKER_USERNAME:-tiag0ss}"
+    read -p "Enter your Docker Hub username: " DOCKER_USERNAME
 fi
 
 if [ -z "$DOCKER_USERNAME" ]; then
@@ -183,8 +182,11 @@ if [ "$VERSION" != "latest" ]; then
     echo "  ${IMAGE_NAME}:latest"
 fi
 echo ""
-echo "Deploy on a VPS (uses install.sh):"
-echo "  OPHIUSSA_IMAGE=$IMAGE_TAG curl -fsSL https://raw.githubusercontent.com/${DOCKER_USERNAME}/OphiussaServerManager/main/install.sh | bash"
+echo "Deploy on a VPS (uses install.sh from your repo clone):"
+echo "  OPHIUSSA_IMAGE=$IMAGE_TAG ./install.sh"
+echo ""
+echo "Or remote install (set your GitHub raw URL):"
+echo "  OPHIUSSA_IMAGE=$IMAGE_TAG curl -fsSL https://raw.githubusercontent.com/<owner>/OphiussaServerManager/main/install.sh | bash"
 echo ""
 echo "Or manually:"
 echo "  docker pull $IMAGE_TAG"

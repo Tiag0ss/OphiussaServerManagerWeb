@@ -254,7 +254,7 @@ export function FilesBrowser({
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
-    let list = q
+    const list = q
       ? entries.filter((e) => e.name.toLowerCase().includes(q))
       : [...entries];
     list.sort((a, b) => {

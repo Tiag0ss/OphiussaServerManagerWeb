@@ -19,12 +19,13 @@ Game server panel for a single Linux VPS. One **panel container** manages many *
 **Requirements:** Linux with Docker Engine (not Docker Desktop on production), open ports for the panel and your games.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Tiag0ss/OphiussaServerManager/main/install.sh | bash
+OPHIUSSA_IMAGE=<dockerhub-user>/ophiussa-server-manager:latest \
+  curl -fsSL https://raw.githubusercontent.com/<owner>/OphiussaServerManager/main/install.sh | bash
 ```
 
 Then open `http://<your-vps-ip>:3000/setup` and create the admin account.
 
-The installer pulls `tiag0ss/ophiussa-server-manager:latest`, creates `/opt/ophiussa/data`, and starts the container with:
+The installer pulls the image you set in `OPHIUSSA_IMAGE`, creates `/opt/ophiussa/data`, and starts the container with:
 
 | Host port | Container | Purpose |
 |-----------|-----------|---------|
@@ -37,21 +38,21 @@ The installer pulls `tiag0ss/ophiussa-server-manager:latest`, creates `/opt/ophi
 Override defaults with environment variables:
 
 ```bash
-OPHIUSSA_IMAGE=tiag0ss/ophiussa-server-manager:0.1.0 \
+OPHIUSSA_IMAGE=<dockerhub-user>/ophiussa-server-manager:0.1.0 \
 OPHIUSSA_DATA_DIR=/opt/ophiussa/data \
 OPHIUSSA_HTTP_PORT=3000 \
 OPHIUSSA_FTP_PORT=21 \
 OPHIUSSA_SFTP_PORT=2022 \
 OPHIUSSA_CONTAINER_NAME=ophiussa \
-  curl -fsSL https://raw.githubusercontent.com/Tiag0ss/OphiussaServerManager/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/<owner>/OphiussaServerManager/main/install.sh | bash
 ```
 
 Or run the script from a clone:
 
 ```bash
-git clone https://github.com/Tiag0ss/OphiussaServerManager.git
+git clone https://github.com/<owner>/OphiussaServerManager.git
 cd OphiussaServerManager
-./install.sh
+OPHIUSSA_IMAGE=<dockerhub-user>/ophiussa-server-manager:latest ./install.sh
 ```
 
 ### Manual `docker run`
@@ -59,7 +60,7 @@ cd OphiussaServerManager
 ```bash
 mkdir -p /opt/ophiussa/data/{servers,backups,logs}
 
-docker pull tiag0ss/ophiussa-server-manager:latest
+docker pull <dockerhub-user>/ophiussa-server-manager:latest
 
 docker run -d \
   --name ophiussa \
@@ -69,7 +70,7 @@ docker run -d \
   -p 2022:2022 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v /opt/ophiussa/data:/data \
-  tiag0ss/ophiussa-server-manager:latest
+  <dockerhub-user>/ophiussa-server-manager:latest
 ```
 
 **Volumes**
@@ -84,9 +85,9 @@ docker run -d \
 ### Updating the panel
 
 ```bash
-docker pull tiag0ss/ophiussa-server-manager:latest
+docker pull <dockerhub-user>/ophiussa-server-manager:latest
 docker stop ophiussa && docker rm ophiussa
-./install.sh   # or re-run your docker run command
+OPHIUSSA_IMAGE=<dockerhub-user>/ophiussa-server-manager:latest ./install.sh
 ```
 
 Game servers keep running while the panel is down; they are independent containers. After the panel restarts, it reconnects to existing containers via Docker.
@@ -105,9 +106,8 @@ The root `Dockerfile` is multi-stage:
 ### One-command build & push
 
 ```bash
-./docker-build.sh              # tags latest, pushes to Docker Hub
-./docker-build.sh 0.1.0        # also tags :latest when version ≠ latest
-DOCKER_USERNAME=tiag0ss ./docker-build.sh 0.1.0
+DOCKER_USERNAME=<dockerhub-user> ./docker-build.sh              # tags latest, pushes to Docker Hub
+DOCKER_USERNAME=<dockerhub-user> ./docker-build.sh 0.1.0      # also tags :latest when version ≠ latest
 ```
 
 The script runs tests, logs in to Docker Hub, and uses `docker buildx` when available (with provenance attestation).
@@ -115,8 +115,8 @@ The script runs tests, logs in to Docker Hub, and uses `docker buildx` when avai
 ### Manual build
 
 ```bash
-docker build --target production -t tiag0ss/ophiussa-server-manager:0.1.0 .
-docker push tiag0ss/ophiussa-server-manager:0.1.0
+docker build --target production -t <dockerhub-user>/ophiussa-server-manager:0.1.0 .
+docker push <dockerhub-user>/ophiussa-server-manager:0.1.0
 ```
 
 Uses **pnpm** (`corepack enable` + frozen lockfile). Do not use `npm install` in the Docker build context.
@@ -175,7 +175,7 @@ Pass env vars at runtime:
 ```bash
 docker run -d ... \
   -e AUTH_SECRET="$(openssl rand -hex 32)" \
-  tiag0ss/ophiussa-server-manager:latest
+  <dockerhub-user>/ophiussa-server-manager:latest
 ```
 
 ---
