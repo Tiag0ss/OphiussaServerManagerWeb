@@ -35,6 +35,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
+import { FileCodeEditor } from "@/components/file-code-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { Modal } from "@/components/ui/modal";
@@ -177,6 +178,7 @@ export function FilesBrowser({
   const [editor, setEditor] = useState<{ path: string; content: string } | null>(
     null,
   );
+  const [editorMaximized, setEditorMaximized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; path: string } | null>(
     null,
@@ -996,27 +998,37 @@ export function FilesBrowser({
         title={editor ? basename(editor.path) : "Edit file"}
         description={editor?.path}
         wide
-        onClose={() => setEditor(null)}
+        maximizable
+        fill
+        maximized={editorMaximized}
+        onMaximizedChange={setEditorMaximized}
+        onClose={() => {
+          setEditor(null);
+          setEditorMaximized(false);
+        }}
+        actions={
+          <Button size="sm" disabled={saving} onClick={saveEditor}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
+        }
       >
         {editor && (
-          <div className="space-y-3">
-            <textarea
-              className="h-[28rem] w-full rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs"
-              value={editor.content}
-              onChange={(e) =>
-                setEditor((cur) =>
-                  cur ? { ...cur, content: e.target.value } : cur,
-                )
-              }
-              spellCheck={false}
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setEditor(null)}>
-                Close
-              </Button>
-              <Button disabled={saving} onClick={saveEditor}>
-                {saving ? "Saving…" : "Save"}
-              </Button>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div
+              className={cn(
+                "min-h-0 flex-1 overflow-hidden rounded-lg border border-border",
+                !editorMaximized && "min-h-[28rem]",
+              )}
+            >
+              <FileCodeEditor
+                value={editor.content}
+                filename={editor.path}
+                height="100%"
+                className="h-full [&_.cm-editor]:h-full [&_.cm-editor]:min-h-[inherit]"
+                onChange={(content) =>
+                  setEditor((cur) => (cur ? { ...cur, content } : cur))
+                }
+              />
             </div>
           </div>
         )}
