@@ -1,17 +1,24 @@
+when:
+  - event: [push, pull_request]
+    branch:
+      - main
+      - master
+
 steps:
   check:
-    image: node:22-alpine
+    # Full image includes python3/make/g++ needed by better-sqlite3 (node-gyp).
+    # Alpine slim fails with: "Could not find any Python installation to use".
+    image: node:22-bookworm
     commands:
       - corepack enable
-      - corepack prepare pnpm@10 --activate
+      - corepack prepare pnpm@9.15.9 --activate
       - pnpm install --frozen-lockfile
       - pnpm lint
       - pnpm exec tsc --noEmit
-      - pnpm typecheck
-      - pnpm test:unit
+      - pnpm test
 
   get-version:
-    image: node:22-alpine
+    image: node:22-bookworm
     commands:
       - VERSION=$(node -p "require('./package.json').version")
       - echo "latest,$VERSION" > .tags
@@ -25,9 +32,3 @@ steps:
         from_secret: DOCKER_USERNAME
       password:
         from_secret: DOCKER_PASSWORD
-
-when:
-  - event: [push, pull_request]
-    branch:
-      - main
-      - master
