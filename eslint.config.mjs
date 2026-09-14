@@ -9,17 +9,25 @@ const compat = new FlatCompat({
   baseDirectory: __dirname,
 });
 
+/** @type {import("eslint").Linter.Config[]} */
 const eslintConfig = [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  // Global ignores must be first (own object) so FlatCompat configs never see them.
   {
     ignores: [
       "node_modules/**",
       ".next/**",
+      ".pnpm-store/**",
       "out/**",
       "build/**",
+      "coverage/**",
+      "data/**",
+      "tmp/**",
+      "public/**",
       "next-env.d.ts",
+      "*.tsbuildinfo",
     ],
   },
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
 ];
 
 export default eslintConfig;
