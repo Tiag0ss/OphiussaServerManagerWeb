@@ -309,14 +309,35 @@ function mergeDir(src: string, dest: string) {
   }
 }
 
-function dirByNameInsensitive(parent: string, wanted: string): string | null {
-  if (!existsSync(parent)) return null;
-  const exact = path.join(parent, wanted);
-  if (existsSync(exact)) return exact;
-  const found = readdirSync(parent).find(
-    (n) => n.toLowerCase() === wanted.toLowerCase(),
-  );
-  return found ? path.join(parent, found) : null;
+/**
+ * Breadth-first search (bounded depth) for a directory named `wanted`
+ * anywhere under `root`. Real Thunderstore packages ship `manifest.json`,
+ * `README.md`, `icon.png` alongside the actual content folder, so the
+ * target directory is rarely at the top level — a plain top-level check
+ * misses it and a naive "unwrap the one folder" heuristic never fires
+ * because the top level has several entries, not one.
+ */
+function findDirRecursive(
+  root: string,
+  wanted: string,
+  maxDepth = 4,
+): string | null {
+  const wantedLower = wanted.toLowerCase();
+  let frontier = [root];
+  for (let depth = 0; depth <= maxDepth && frontier.length; depth++) {
+    const next: string[] = [];
+    for (const dir of frontier) {
+      if (!existsSync(dir)) continue;
+      for (const name of readdirSync(dir)) {
+        const full = path.join(dir, name);
+        if (!statSync(full).isDirectory()) continue;
+        if (name.toLowerCase() === wantedLower) return full;
+        next.push(full);
+      }
+    }
+    frontier = next;
+  }
+  return null;
 }
 
 /** Template installPath is e.g. bepinex/plugins — that casing is what the image uses. */
@@ -354,21 +375,37 @@ function placeThunderstoreExtract(
   const pluginsDest = path.join(dataDir, installPath);
   const bepinexDest = bepinexRootFromInstallPath(dataDir, installPath);
 
-  const zipBep = dirByNameInsensitive(extractDir, "BepInEx");
+  // Packages vary: some ship BepInEx/ or plugins/ right at the top, others
+  // bury it under manifest.json/README.md/icon.png plus a wrapper folder
+  // (e.g. "manifest.json, icon.png, ModName/plugins/…"). Search the whole
+  // extracted tree for the first BepInEx/plugins folder rather than only
+  // checking the top level.
+  const zipBep = findDirRecursive(extractDir, "BepInEx");
   if (zipBep) {
     mergeDir(zipBep, bepinexDest);
     mergeWrongCaseBepInEx(dataDir, bepinexDest);
     return pluginsDest;
   }
 
-  const zipPlugins = dirByNameInsensitive(extractDir, "plugins");
+  const zipPlugins = findDirRecursive(extractDir, "plugins");
   if (zipPlugins) {
     mergeDir(zipPlugins, pluginsDest);
     mergeWrongCaseBepInEx(dataDir, bepinexDest);
     return pluginsDest;
   }
 
-  mergeDir(extractDir, path.join(pluginsDest, path.basename(extractDir)));
+  // Neither found anywhere: unwrap any redundant single-folder wrapper(s),
+  // then drop the remaining content straight into plugins/.
+  let current = extractDir;
+  for (;;) {
+    const entries = existsSync(current) ? readdirSync(current) : [];
+    if (entries.length === 1 && statSync(path.join(current, entries[0])).isDirectory()) {
+      current = path.join(current, entries[0]);
+      continue;
+    }
+    break;
+  }
+  mergeDir(current, pluginsDest);
   mergeWrongCaseBepInEx(dataDir, bepinexDest);
   return pluginsDest;
 }

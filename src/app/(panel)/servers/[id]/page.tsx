@@ -18,6 +18,8 @@ import { ServerMetricsPanel } from "@/components/servers/server-metrics";
 import { ServerHealthBadge } from "@/components/servers/server-health-badge";
 import { ServerPermissionsPanel } from "@/components/servers/server-permissions-panel";
 import { ServerTransferPanel } from "@/components/servers/server-transfer-panel";
+import { TabBar } from "@/components/ui/tab-bar";
+import { Modal } from "@/components/ui/modal";
 
 type QuotaHeadroom = {
   maxServers: number;
@@ -37,6 +39,7 @@ type ServerPayload = {
     cpuLimit: number;
     ftpUsername?: string | null;
     ftpEnabled: boolean;
+    rconEnabled: boolean;
     config: Record<string, unknown>;
   };
   template: GameTemplate;
@@ -81,12 +84,14 @@ export default function ServerDetailPage() {
   >("overview");
   const [config, setConfig] = useState<Record<string, unknown>>({});
   const [logs, setLogs] = useState("");
+  const [rconLog, setRconLog] = useState("");
   const [command, setCommand] = useState("");
   const [memoryMb, setMemoryMb] = useState(2048);
   const [cpuLimit, setCpuLimit] = useState(1);
   const [portDraft, setPortDraft] = useState<Record<string, number>>({});
   const [resourceBusy, setResourceBusy] = useState(false);
   const [consoleRef, setConsoleRef] = useState<HTMLPreElement | null>(null);
+  const [rconRef, setRconRef] = useState<HTMLPreElement | null>(null);
   const [mods, setMods] = useState<
     Array<{
       id: string;
@@ -120,27 +125,46 @@ export default function ServerDetailPage() {
     Array<{ id: string; name: string; cron: string; action: string }>
   >([]);
   const [confirmName, setConfirmName] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [ftpPassword, setFtpPassword] = useState<string | null>(null);
   const [ftpResetBusy, setFtpResetBusy] = useState(false);
+  const [configTab, setConfigTab] = useState<"game" | "network" | "rcon">(
+    "game",
+  );
+  const [rconEnabled, setRconEnabled] = useState(false);
+  const [rconPort, setRconPort] = useState(25575);
+  const [rconPassword, setRconPassword] = useState("");
+  const [rconBusy, setRconBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/servers/${id}`);
-    if (!res.ok) return;
-    const json = (await res.json()) as ServerPayload;
-    setData(json);
-    setConfig(json.server.config);
-    setMemoryMb(json.server.memoryMb);
-    setCpuLimit(json.server.cpuLimit);
-    setFtpPassword(json.ftpPassword ?? null);
-    const draft: Record<string, number> = {};
-    for (const p of json.ports || []) draft[p.key] = p.hostPort;
-    setPortDraft(draft);
-  }, [id]);
+  const load = useCallback(
+    async (opts?: { syncDrafts?: boolean }) => {
+      const res = await fetch(`/api/servers/${id}`);
+      if (!res.ok) return;
+      const json = (await res.json()) as ServerPayload;
+      setData(json);
+      if (opts?.syncDrafts === false) return;
+      setConfig(json.server.config);
+      setMemoryMb(json.server.memoryMb);
+      setCpuLimit(json.server.cpuLimit);
+      setFtpPassword(json.ftpPassword ?? null);
+      const draft: Record<string, number> = {};
+      for (const p of json.ports || []) draft[p.key] = p.hostPort;
+      setPortDraft(draft);
+      setRconEnabled(json.server.rconEnabled);
+      const rconAlloc = (json.ports || []).find((p) => p.key === "rcon");
+      if (rconAlloc) setRconPort(rconAlloc.hostPort);
+      setRconPassword(String(json.server.config.rconPassword ?? ""));
+    },
+    [id],
+  );
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 8000);
+    // Keep status/metrics live without clobbering in-progress edits on
+    // Config/RCON/Resources — those only re-sync on mount or after a save.
+    const t = setInterval(() => load({ syncDrafts: false }), 8000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -162,6 +186,11 @@ export default function ServerDetailPage() {
     if (!consoleRef) return;
     consoleRef.scrollTop = consoleRef.scrollHeight;
   }, [logs, consoleRef]);
+
+  useEffect(() => {
+    if (!rconRef) return;
+    rconRef.scrollTop = rconRef.scrollHeight;
+  }, [rconLog, rconRef]);
 
   useEffect(() => {
     if (tab !== "mods") return;
@@ -252,7 +281,30 @@ export default function ServerDetailPage() {
     load();
   }
 
+  async function saveRcon(enabled: boolean) {
+    setRconBusy(true);
+    setMessage("");
+    const res = await fetch(`/api/servers/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        enabled
+          ? { rconEnabled: true, rconPort, rconPassword }
+          : { rconEnabled: false },
+      ),
+    });
+    const j = await res.json().catch(() => ({}));
+    setRconBusy(false);
+    if (!res.ok) {
+      setMessage(j.error || "Could not update RCON");
+      return;
+    }
+    setMessage(enabled ? "RCON enabled — container recreated" : "RCON disabled — container recreated");
+    load();
+  }
+
   async function wipe() {
+    setDeleting(true);
     const res = await fetch(`/api/servers/${id}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -260,6 +312,8 @@ export default function ServerDetailPage() {
     });
     if (!res.ok) {
       const j = await res.json();
+      setDeleting(false);
+      setConfirmDeleteOpen(false);
       setMessage(j.error || "Delete failed");
       return;
     }
@@ -346,22 +400,7 @@ export default function ServerDetailPage() {
         </p>
       )}
 
-      <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-sm capitalize ${
-              tab === t
-                ? "bg-accent text-accent-fg"
-                : "bg-card-elevated text-muted"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <TabBar tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === "overview" && (
         <div className="space-y-4">
@@ -371,230 +410,344 @@ export default function ServerDetailPage() {
             memoryLimitMb={data.stats?.memoryLimitMb ?? data.server.memoryMb}
             cpuLimit={data.server.cpuLimit}
           />
-          <div className="grid gap-4 md:grid-cols-2">
-          <Card className="space-y-3">
-            <div>
-              <h3 className="font-medium">Network / ports</h3>
-              <p className="text-sm text-muted">
-                Connect using the host ports below (not the container ports).
-                {data.portRange
-                  ? ` Allowed range ${data.portRange.start}–${data.portRange.end}.`
-                  : ""}{" "}
-                Changing ports recreates the container.
-              </p>
-            </div>
-            <ul className="space-y-2 text-sm">
-              {data.ports.map((p) => (
-                <li key={p.key} className="flex flex-wrap items-center gap-2">
-                  <span className="min-w-[5rem] font-medium">{p.key}</span>
-                  <span className="text-muted">
-                    {data.publicIp || "host"}:
-                  </span>
-                  <Input
-                    className="w-28"
-                    type="number"
-                    value={portDraft[p.key] ?? p.hostPort}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      setPortDraft((prev) =>
-                        syncSharedHostPorts(
-                          data.template.runtime.ports,
-                          prev,
-                          p.key,
-                          value,
-                        ),
-                      );
-                    }}
-                  />
-                  <span className="text-xs text-muted">/{p.protocol}</span>
-                </li>
-              ))}
-            </ul>
-            <Button
-              size="sm"
-              disabled={resourceBusy}
-              onClick={async () => {
-                setResourceBusy(true);
-                setMessage("");
-                const res = await fetch(`/api/servers/${id}`, {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ ports: portDraft }),
-                });
-                const j = await res.json().catch(() => ({}));
-                setResourceBusy(false);
-                if (!res.ok) setMessage(j.error || "Port update failed");
-                else {
-                  setMessage("Ports updated — container recreated");
-                  load();
-                }
-              }}
-            >
-              Apply ports
-            </Button>
-          </Card>
-          <Card className="space-y-3">
-            <h3 className="font-medium">FTP / SFTP</h3>
-            <p className="text-sm text-muted">
-              Host: <code>{data.publicIp || "localhost"}</code>
-              <br />
-              Ports: FTP {data.ftpPort ?? 2121} · SFTP {data.sftpPort ?? 2022}
-              <br />
-              Enabled: {data.server.ftpEnabled ? "yes" : "no"}
-            </p>
-            {data.server.ftpUsername ? (
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-xs text-muted">Username</Label>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <code className="rounded-md border border-border bg-card-elevated px-2 py-1 text-xs">
-                      {data.server.ftpUsername}
-                    </code>
-                    <CopyTextButton text={data.server.ftpUsername} label="Copy user" />
-                  </div>
-                </div>
-                <div>
-                  <Label className="text-xs text-muted">Password</Label>
-                  {ftpPassword ? (
-                    <SecretInput
-                      className="mt-1"
-                      value={ftpPassword}
-                      readOnly
-                    />
-                  ) : (
-                    <p className="mt-1 text-sm text-muted">
-                      Not stored for this server — reset to generate a copyable
-                      password.
-                    </p>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted">No FTP account configured.</p>
-            )}
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={ftpResetBusy}
-              onClick={resetFtpPassword}
-            >
-              {ftpResetBusy ? "Resetting…" : "Reset password"}
-            </Button>
-          </Card>
-          <Card className="md:col-span-2 space-y-3">
-            <div>
-              <h3 className="font-medium">Resources</h3>
-              <p className="text-sm text-muted">
-                Changing RAM or CPU recreates the container. Limits follow the
-                owner&apos;s quota
-                {data.quotas
-                  ? ` (up to ${data.server.memoryMb + data.quotas.remainingMemoryMb} MB RAM · ${data.server.cpuLimit + data.quotas.remainingCpu} CPU available for this server)`
-                  : data.isAdmin
-                    ? " (admin — no quota cap)"
-                    : ""}
-                .
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <Label>RAM (MB)</Label>
-                <Input
-                  type="number"
-                  min={256}
-                  step={256}
-                  max={
-                    data.quotas
-                      ? data.server.memoryMb + data.quotas.remainingMemoryMb
-                      : undefined
-                  }
-                  value={memoryMb}
-                  onChange={(e) => setMemoryMb(Number(e.target.value))}
-                />
-              </div>
-              <div>
-                <Label>CPU limit</Label>
-                <Input
-                  type="number"
-                  min={0.25}
-                  step={0.25}
-                  max={
-                    data.quotas
-                      ? data.server.cpuLimit + data.quotas.remainingCpu
-                      : undefined
-                  }
-                  value={cpuLimit}
-                  onChange={(e) => setCpuLimit(Number(e.target.value))}
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                onClick={saveResources}
-                disabled={
-                  resourceBusy ||
-                  (memoryMb === data.server.memoryMb &&
-                    cpuLimit === data.server.cpuLimit)
-                }
-              >
-                {resourceBusy ? "Applying…" : "Apply resources"}
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={resourceBusy}
-                onClick={async () => {
-                  setResourceBusy(true);
-                  setMessage("");
-                  const res = await fetch(`/api/servers/${id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ recreate: true }),
-                  });
-                  const j = await res.json().catch(() => ({}));
-                  setResourceBusy(false);
-                  if (!res.ok) setMessage(j.error || "Recreate failed");
-                  else {
-                    setMessage("Container recreated — you can Start again");
-                    load();
-                  }
-                }}
-              >
-                Recreate container
-              </Button>
-            </div>
-          </Card>
-          </div>
         </div>
       )}
 
       {tab === "config" && (
-        <Card className="space-y-4">
-          <TemplateForm
-            template={data.template}
-            value={config}
-            onChange={setConfig}
-            mode="all"
+        <div className="space-y-4">
+          <TabBar
+            tabs={["game", "network", "rcon"] as const}
+            value={configTab}
+            onChange={setConfigTab}
+            labels={{ game: "Game settings", network: "Network & resources", rcon: "RCON" }}
           />
-          <Button onClick={saveConfig}>Save & recreate container</Button>
-        </Card>
+
+          {configTab === "game" && (
+            <Card className="space-y-4">
+              <TemplateForm
+                template={data.template}
+                value={config}
+                onChange={setConfig}
+                mode="all"
+              />
+              <Button onClick={saveConfig}>Save & recreate container</Button>
+            </Card>
+          )}
+
+          {configTab === "network" && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card className="space-y-3">
+                <div>
+                  <h3 className="font-medium">Network / ports</h3>
+                  <p className="text-sm text-muted">
+                    Connect using the host ports below (not the container ports).
+                    {data.portRange
+                      ? ` Allowed range ${data.portRange.start}–${data.portRange.end}.`
+                      : ""}{" "}
+                    Changing ports recreates the container.
+                  </p>
+                </div>
+                <ul className="space-y-2 text-sm">
+                  {data.ports
+                    .filter((p) => p.key !== "rcon")
+                    .map((p) => (
+                    <li key={p.key} className="flex flex-wrap items-center gap-2">
+                      <span className="min-w-[5rem] font-medium">{p.key}</span>
+                      <span className="text-muted">
+                        {data.publicIp || "host"}:
+                      </span>
+                      <Input
+                        className="w-28"
+                        type="number"
+                        value={portDraft[p.key] ?? p.hostPort}
+                        onChange={(e) => {
+                          const value = Number(e.target.value);
+                          setPortDraft((prev) =>
+                            syncSharedHostPorts(
+                              data.template.runtime.ports,
+                              prev,
+                              p.key,
+                              value,
+                            ),
+                          );
+                        }}
+                      />
+                      <span className="text-xs text-muted">/{p.protocol}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  size="sm"
+                  disabled={resourceBusy}
+                  onClick={async () => {
+                    setResourceBusy(true);
+                    setMessage("");
+                    const res = await fetch(`/api/servers/${id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ ports: portDraft }),
+                    });
+                    const j = await res.json().catch(() => ({}));
+                    setResourceBusy(false);
+                    if (!res.ok) setMessage(j.error || "Port update failed");
+                    else {
+                      setMessage("Ports updated — container recreated");
+                      load();
+                    }
+                  }}
+                >
+                  Apply ports
+                </Button>
+              </Card>
+              <Card className="space-y-3">
+                <h3 className="font-medium">FTP / SFTP</h3>
+                <p className="text-sm text-muted">
+                  Host: <code>{data.publicIp || "localhost"}</code>
+                  <br />
+                  Ports: FTP {data.ftpPort ?? 2121} · SFTP {data.sftpPort ?? 2022}
+                  <br />
+                  Enabled: {data.server.ftpEnabled ? "yes" : "no"}
+                </p>
+                {data.server.ftpUsername ? (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs text-muted">Username</Label>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <code className="rounded-md border border-border bg-card-elevated px-2 py-1 text-xs">
+                          {data.server.ftpUsername}
+                        </code>
+                        <CopyTextButton text={data.server.ftpUsername} label="Copy user" />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted">Password</Label>
+                      {ftpPassword ? (
+                        <SecretInput
+                          className="mt-1"
+                          value={ftpPassword}
+                          readOnly
+                        />
+                      ) : (
+                        <p className="mt-1 text-sm text-muted">
+                          Not stored for this server — reset to generate a copyable
+                          password.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">No FTP account configured.</p>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={ftpResetBusy}
+                  onClick={resetFtpPassword}
+                >
+                  {ftpResetBusy ? "Resetting…" : "Reset password"}
+                </Button>
+              </Card>
+              <Card className="md:col-span-2 space-y-3">
+                <div>
+                  <h3 className="font-medium">Resources</h3>
+                  <p className="text-sm text-muted">
+                    Changing RAM or CPU recreates the container. Limits follow the
+                    owner&apos;s quota
+                    {data.quotas
+                      ? ` (up to ${data.server.memoryMb + data.quotas.remainingMemoryMb} MB RAM · ${data.server.cpuLimit + data.quotas.remainingCpu} CPU available for this server)`
+                      : data.isAdmin
+                        ? " (admin — no quota cap)"
+                        : ""}
+                    .
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>RAM (MB)</Label>
+                    <Input
+                      type="number"
+                      min={256}
+                      step={256}
+                      max={
+                        data.quotas
+                          ? data.server.memoryMb + data.quotas.remainingMemoryMb
+                          : undefined
+                      }
+                      value={memoryMb}
+                      onChange={(e) => setMemoryMb(Number(e.target.value))}
+                    />
+                  </div>
+                  <div>
+                    <Label>CPU limit</Label>
+                    <Input
+                      type="number"
+                      min={0.25}
+                      step={0.25}
+                      max={
+                        data.quotas
+                          ? data.server.cpuLimit + data.quotas.remainingCpu
+                          : undefined
+                      }
+                      value={cpuLimit}
+                      onChange={(e) => setCpuLimit(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={saveResources}
+                    disabled={
+                      resourceBusy ||
+                      (memoryMb === data.server.memoryMb &&
+                        cpuLimit === data.server.cpuLimit)
+                    }
+                  >
+                    {resourceBusy ? "Applying…" : "Apply resources"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={resourceBusy}
+                    onClick={async () => {
+                      setResourceBusy(true);
+                      setMessage("");
+                      const res = await fetch(`/api/servers/${id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ recreate: true }),
+                      });
+                      const j = await res.json().catch(() => ({}));
+                      setResourceBusy(false);
+                      if (!res.ok) setMessage(j.error || "Recreate failed");
+                      else {
+                        setMessage("Container recreated — you can Start again");
+                        load();
+                      }
+                    }}
+                  >
+                    Recreate container
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {configTab === "rcon" && (
+            <Card className="space-y-3">
+              <div>
+                <h3 className="font-medium">RCON</h3>
+                {data.template.rcon?.enabled ? (
+                  <p className="text-sm text-muted">
+                    This game has native RCON support — its port and password
+                    are set as regular fields under Game settings.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted">
+                    This game template has no built-in RCON, but if you
+                    installed a mod that adds it (e.g. a Valheim RCON mod),
+                    tell the panel its port and password here so the Console
+                    tab can send commands to it.
+                  </p>
+                )}
+              </div>
+              {!data.template.rcon?.enabled && (
+                <>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={rconEnabled}
+                      onChange={(e) => setRconEnabled(e.target.checked)}
+                    />
+                    Enable manual RCON for this server
+                  </label>
+                  {rconEnabled && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <Label>RCON port</Label>
+                        <Input
+                          type="number"
+                          min={1024}
+                          max={65535}
+                          value={rconPort}
+                          onChange={(e) => setRconPort(Number(e.target.value))}
+                        />
+                        <p className="mt-1 text-xs text-muted">
+                          Must match the port the mod listens on inside the
+                          container; used as both host and container port.
+                        </p>
+                      </div>
+                      <div>
+                        <Label>RCON password</Label>
+                        <SecretInput
+                          value={rconPassword}
+                          onChange={setRconPassword}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      disabled={
+                        rconBusy ||
+                        (rconEnabled && (!rconPort || !rconPassword))
+                      }
+                      onClick={() => saveRcon(rconEnabled)}
+                    >
+                      {rconBusy ? "Saving…" : "Save RCON settings"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </Card>
+          )}
+        </div>
       )}
 
       {tab === "console" && (
         <Card className="space-y-3">
-          <pre
-            ref={setConsoleRef}
-            className="h-80 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-ok"
-          >
-            {logs || "Waiting for logs…"}
-          </pre>
+          <div>
+            <Label className="text-xs text-muted">Container logs</Label>
+            <pre
+              ref={setConsoleRef}
+              className="mt-1 h-64 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-ok"
+            >
+              {logs || "Waiting for logs…"}
+            </pre>
+          </div>
+          <div>
+            <Label className="text-xs text-muted">RCON</Label>
+            <pre
+              ref={setRconRef}
+              className="mt-1 h-40 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-accent"
+            >
+              {rconLog || "No commands sent yet."}
+            </pre>
+          </div>
           <form
             className="flex gap-2"
             onSubmit={async (e) => {
               e.preventDefault();
-              await fetch(`/api/servers/${id}/console`, {
+              const sent = command;
+              const res = await fetch(`/api/servers/${id}/console`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ command }),
+                body: JSON.stringify({ command: sent }),
               });
+              const j = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                setMessage(j.error || "Command failed");
+                setRconLog((prev) =>
+                  (prev + `> ${sent}\nError: ${j.error || "Command failed"}\n`).slice(
+                    -50000,
+                  ),
+                );
+              } else {
+                setRconLog((prev) =>
+                  (
+                    prev +
+                    `> ${sent}\n${j.result?.trim() ? j.result : "(no response)"}\n`
+                  ).slice(-50000),
+                );
+              }
               setCommand("");
             }}
           >
@@ -1051,25 +1204,57 @@ export default function ServerDetailPage() {
       {tab === "access" && <ServerPermissionsPanel serverId={id} />}
 
       {tab === "danger" && (
-        <div className="space-y-4">
-          <ServerTransferPanel serverId={id} />
-        <Card className="space-y-3 border-danger/40">
-          <h3 className="font-medium text-danger">Delete server</h3>
-          <p className="text-sm text-muted">
-            This permanently removes the container, data folder, backups, FTP
-            account and database record. Type the server name to confirm.
-          </p>
-          <Input
-            value={confirmName}
-            onChange={(e) => setConfirmName(e.target.value)}
-            placeholder={data.server.name}
+        <div className="space-y-6">
+          <ServerTransferPanel
+            serverId={id}
+            templateId={data.server.templateId}
           />
-          <Button variant="danger" onClick={wipe}>
-            Delete everything
-          </Button>
-        </Card>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-danger">
+              Danger zone
+            </h3>
+            <Card className="space-y-3 border-danger/40">
+              <h4 className="font-medium text-danger">Delete server</h4>
+              <p className="text-sm text-muted">
+                This permanently removes the container, data folder, backups,
+                FTP account and database record. Type the server name to
+                confirm.
+              </p>
+              <Input
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+                placeholder={data.server.name}
+              />
+              <Button
+                variant="danger"
+                disabled={confirmName !== data.server.name}
+                onClick={() => setConfirmDeleteOpen(true)}
+              >
+                Delete everything
+              </Button>
+            </Card>
+          </div>
         </div>
       )}
+
+      <Modal
+        open={confirmDeleteOpen}
+        title="Delete this server?"
+        description={data.server.name}
+        onClose={() => !deleting && setConfirmDeleteOpen(false)}
+        actions={
+          <Button variant="danger" disabled={deleting} onClick={wipe}>
+            {deleting ? "Deleting…" : "Yes, delete everything"}
+          </Button>
+        }
+      >
+        <p className="text-sm text-muted">
+          This cannot be undone. The container, data folder, backups, FTP
+          account and database record for <strong>{data.server.name}</strong>{" "}
+          will be permanently removed.
+        </p>
+      </Modal>
     </div>
   );
 }

@@ -172,8 +172,32 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
   }
 
+  let rconChanged = false;
+  if (typeof body.rconEnabled === "boolean") {
+    const { setManualRconPort } = await import("@/lib/docker/servers");
+    if (body.rconEnabled) {
+      const port = Number(body.rconPort);
+      if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+        return NextResponse.json({ error: "Invalid RCON port" }, { status: 400 });
+      }
+      await setManualRconPort(id, port);
+      patch.rconEnabled = true;
+      if (typeof body.rconPassword === "string" && body.rconPassword) {
+        const baseConfig = patch.configJson
+          ? JSON.parse(patch.configJson as string)
+          : JSON.parse(server.configJson);
+        baseConfig.rconPassword = body.rconPassword;
+        patch.configJson = JSON.stringify(baseConfig);
+      }
+    } else {
+      await setManualRconPort(id, null);
+      patch.rconEnabled = false;
+    }
+    rconChanged = true;
+  }
+
   const shouldRecreate =
-    Boolean(body.recreate) || resourcesChanged || portsChanged;
+    Boolean(body.recreate) || resourcesChanged || portsChanged || rconChanged;
 
   db.update(servers).set(patch).where(eq(servers.id, id)).run();
 

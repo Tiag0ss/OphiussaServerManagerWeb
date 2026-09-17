@@ -65,6 +65,8 @@ export const servers = sqliteTable("servers", {
   ftpPasswordHash: text("ftp_password_hash"),
   /** AES-GCM encrypted FTP password (retrievable by authorized panel users). */
   ftpPasswordEnc: text("ftp_password_enc"),
+  /** Manual RCON override for templates with no native rcon: block (e.g. added via a mod). */
+  rconEnabled: integer("rcon_enabled", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });

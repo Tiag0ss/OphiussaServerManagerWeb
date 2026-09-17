@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
-import { cn } from "@/lib/utils";
+import { TabBar } from "@/components/ui/tab-bar";
 
 type FieldDef = {
   key: string;
@@ -108,23 +108,12 @@ export default function SettingsPage() {
         <p className="text-sm text-muted">Panel-wide configuration</p>
       </div>
 
-      <div className="flex flex-wrap gap-2 overflow-x-auto border-b border-border pb-3">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={cn(
-              "shrink-0 rounded-md px-3 py-1.5 text-sm transition",
-              tab === t.id
-                ? "bg-accent text-accent-fg"
-                : "bg-card-elevated text-muted hover:text-foreground",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        tabs={TABS.map((t) => t.id)}
+        value={tab}
+        onChange={setTab}
+        labels={Object.fromEntries(TABS.map((t) => [t.id, t.label])) as Record<TabId, string>}
+      />
 
       <form className="space-y-4" onSubmit={onSubmit}>
         <Card className="space-y-4">

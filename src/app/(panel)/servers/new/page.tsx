@@ -6,7 +6,6 @@ import type { GameTemplate } from "@/lib/templates/types";
 import { TemplateForm } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
-import { SecretInput } from "@/components/ui/secret-input";
 import { syncSharedHostPorts } from "@/lib/port-share";
 import { notifyServersChanged } from "@/lib/servers-changed";
 
@@ -30,7 +29,6 @@ export default function NewServerPage() {
   const [step, setStep] = useState(1);
   const [templateId, setTemplateId] = useState("");
   const [name, setName] = useState("");
-  const [password, setPassword] = useState("changeme");
   const [config, setConfig] = useState<Record<string, unknown>>({});
   const [ports, setPorts] = useState<Record<string, number>>({});
   const [portRange, setPortRange] = useState({ start: 25565, end: 26000 });
@@ -42,6 +40,9 @@ export default function NewServerPage() {
   const [loading, setLoading] = useState(false);
 
   const template = templates.find((t) => t.id === templateId);
+  const hasOwnNameField = template?.fields.some(
+    (f) => f.key === "serverName" || f.key === "sessionName",
+  ) ?? false;
 
   useEffect(() => {
     fetch("/api/templates")
@@ -70,25 +71,20 @@ export default function NewServerPage() {
       if ("serverName" in defaults) defaults.serverName = name;
       if ("sessionName" in defaults) defaults.sessionName = name;
     }
-    if (password) {
-      if ("serverPass" in defaults) defaults.serverPass = password;
-      if ("serverPassword" in defaults) defaults.serverPassword = password;
-      if ("password" in defaults) defaults.password = password;
-      if ("worldPassword" in defaults) defaults.worldPassword = password;
-      if ("connectionPassword" in defaults) defaults.connectionPassword = password;
-    }
     setConfig(defaults);
   }, [templateId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function create() {
-    if (!templateId || !name) return;
+    const finalName =
+      (config.serverName as string) || (config.sessionName as string) || name;
+    if (!templateId || !finalName) return;
     setLoading(true);
     setError("");
     const res = await fetch("/api/servers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name,
+        name: finalName,
         templateId,
         config,
         ports,
@@ -117,7 +113,7 @@ export default function NewServerPage() {
       <div>
         <h2 className="text-2xl font-semibold">Create server</h2>
         <p className="text-sm text-muted">
-          Step {step} of 3 — game, ports & basics, then config
+          Step {step} of 2 — game, then configuration
         </p>
       </div>
 
@@ -134,9 +130,25 @@ export default function NewServerPage() {
               }}
               className="rounded-xl border border-border bg-card p-4 text-left hover:border-accent"
             >
-              <h3 className="font-semibold">{t.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold">{t.name}</h3>
+                <span
+                  className={
+                    t.tested
+                      ? "rounded border border-ok/30 bg-ok/15 px-1.5 py-0.5 text-[10px] font-medium uppercase text-ok"
+                      : "rounded border border-warn/30 bg-warn/15 px-1.5 py-0.5 text-[10px] font-medium uppercase text-warn"
+                  }
+                >
+                  {t.tested ? "Tested" : "Untested"}
+                </span>
+              </div>
               <p className="mt-1 text-sm text-muted">{t.description}</p>
               <p className="mt-2 text-xs text-accent">{modsLabel(t)}</p>
+              {!t.tested && (
+                <p className="mt-1 text-xs text-warn">
+                  Not yet verified end-to-end — may have rough edges.
+                </p>
+              )}
             </button>
           ))}
         </div>
@@ -144,63 +156,12 @@ export default function NewServerPage() {
 
       {step === 2 && template && (
         <Card className="space-y-4">
-          <div>
-            <Label>Server display name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div>
-            <Label>Join password</Label>
-            <SecretInput value={password} onChange={setPassword} />
-          </div>
-          <div>
-            <Label>
-              Host ports{" "}
-              <span className="font-normal text-muted">
-                (allowed {portRange.start}–{portRange.end})
-              </span>
-            </Label>
-            <p className="mb-2 text-xs text-muted">
-              Consecutive ports are suggested automatically. Change them within
-              your allowed range.
-            </p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {template.runtime.ports.map((p) => (
-                <div key={p.key}>
-                  <Label className="text-xs">
-                    {p.key} → container {p.container}/{p.protocol}
-                  </Label>
-                  <Input
-                    type="number"
-                    min={portRange.start}
-                    max={portRange.end}
-                    value={ports[p.key] ?? ""}
-                    onChange={(e) => {
-                      const value = Number(e.target.value);
-                      setPorts((prev) =>
-                        syncSharedHostPorts(
-                          template.runtime.ports,
-                          prev,
-                          p.key,
-                          value,
-                        ),
-                      );
-                    }}
-                  />
-                </div>
-              ))}
+          {!hasOwnNameField && (
+            <div>
+              <Label>Server display name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setStep(1)}>
-              Back
-            </Button>
-            <Button onClick={() => setStep(3)}>Continue</Button>
-          </div>
-        </Card>
-      )}
-
-      {step === 3 && template && (
-        <Card className="space-y-4">
+          )}
           <div className="flex items-center justify-between">
             <h3 className="font-medium">Configuration</h3>
             <Button
@@ -216,6 +177,13 @@ export default function NewServerPage() {
             value={config}
             onChange={setConfig}
             mode={showAdvanced ? "all" : "simple"}
+            ports={ports}
+            portRange={portRange}
+            onPortChange={(key, val) =>
+              setPorts((prev) =>
+                syncSharedHostPorts(template.runtime.ports, prev, key, val),
+              )
+            }
           />
           {error && <p className="text-sm text-danger">{error}</p>}
           {ftpCreds && (
@@ -225,7 +193,7 @@ export default function NewServerPage() {
             </p>
           )}
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setStep(2)}>
+            <Button variant="secondary" onClick={() => setStep(1)}>
               Back
             </Button>
             <Button onClick={create} disabled={loading}>

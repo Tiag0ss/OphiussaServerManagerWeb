@@ -11,7 +11,7 @@ export type AlertPayload = {
 };
 
 async function sendDiscord(webhook: string, payload: AlertPayload) {
-  await fetch(webhook, {
+  const res = await fetch(webhook, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -30,10 +30,15 @@ async function sendDiscord(webhook: string, payload: AlertPayload) {
       ],
     }),
   });
+  if (!res.ok) {
+    throw new Error(
+      `Discord webhook failed: ${res.status} ${res.statusText} — ${await res.text()}`,
+    );
+  }
 }
 
 async function sendWebhook(url: string, payload: AlertPayload) {
-  await fetch(url, {
+  const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -41,6 +46,11 @@ async function sendWebhook(url: string, payload: AlertPayload) {
       at: new Date().toISOString(),
     }),
   });
+  if (!res.ok) {
+    throw new Error(
+      `Alert webhook failed: ${res.status} ${res.statusText} — ${await res.text()}`,
+    );
+  }
 }
 
 async function sendEmail(payload: AlertPayload) {
@@ -67,13 +77,25 @@ export async function dispatchAlert(payload: AlertPayload) {
   const s = getSettings();
   const tasks: Promise<void>[] = [];
   if (s.alertDiscordWebhook) {
-    tasks.push(sendDiscord(s.alertDiscordWebhook, payload).catch(console.error));
+    tasks.push(
+      sendDiscord(s.alertDiscordWebhook, payload).catch((err) =>
+        console.error("[alerts] discord webhook error:", err),
+      ),
+    );
   }
   if (s.alertWebhookUrl) {
-    tasks.push(sendWebhook(s.alertWebhookUrl, payload).catch(console.error));
+    tasks.push(
+      sendWebhook(s.alertWebhookUrl, payload).catch((err) =>
+        console.error("[alerts] generic webhook error:", err),
+      ),
+    );
   }
   if (s.alertEmailEnabled) {
-    tasks.push(sendEmail(payload).catch(console.error));
+    tasks.push(
+      sendEmail(payload).catch((err) =>
+        console.error("[alerts] email error:", err),
+      ),
+    );
   }
   await Promise.all(tasks);
 }
@@ -85,7 +107,9 @@ export async function dispatchAlertDeduped(
   cooldownMs = 15 * 60 * 1000,
 ) {
   const db = getDb();
-  const fingerprint = JSON.stringify({ title: payload.title, message: payload.message });
+  // Fingerprint on severity, not the raw message: fluctuating metrics (e.g.
+  // "CPU at 81.3%") would otherwise change on every tick and defeat the cooldown.
+  const fingerprint = payload.severity;
   const row = db.select().from(alertState).where(eq(alertState.key, key)).get();
   const now = Date.now();
   if (
