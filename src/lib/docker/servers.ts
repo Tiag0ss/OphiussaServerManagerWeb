@@ -36,6 +36,32 @@ import {
 } from "./client";
 import { withServerLock } from "./locks";
 import { sendRcon } from "../rcon/client";
+import { dispatchAlert, sendDiscord } from "../alerts/notify";
+
+/**
+ * Fire-and-forget: a webhook hiccup must never fail a start/stop/etc.
+ * Also posts directly to a server's own "Discord webhook URL" config field
+ * when set — several templates expose that field bound to a container env
+ * var the underlying game image doesn't actually implement, so this is the
+ * only thing that makes it do anything.
+ */
+function notifyLifecycle(
+  server: { name: string; configJson: string },
+  title: string,
+  message: string,
+) {
+  dispatchAlert({ title, message, severity: "info" }).catch(() => undefined);
+  try {
+    const config = JSON.parse(server.configJson) as Record<string, unknown>;
+    const url =
+      typeof config.discordWebhook === "string" ? config.discordWebhook.trim() : "";
+    if (url) {
+      sendDiscord(url, { title, message, severity: "info" }).catch(() => undefined);
+    }
+  } catch {
+    /* malformed config — global alert above still fired */
+  }
+}
 
 /** Docker container names: [a-zA-Z0-9][a-zA-Z0-9_.-]* and typically ≤63 chars. */
 function dockerSlug(value: string, max = 20): string {
@@ -509,6 +535,7 @@ export async function startServer(serverId: string) {
       .set({ status: "running", updatedAt: new Date() })
       .where(eq(servers.id, serverId))
       .run();
+    notifyLifecycle(server, `Server started — ${server.name}`, `${server.name} is now running.`);
   });
 }
 
@@ -542,6 +569,11 @@ export async function stopServer(serverId: string, opts?: { kill?: boolean }) {
       .set({ status: "stopped", updatedAt: new Date() })
       .where(eq(servers.id, serverId))
       .run();
+    notifyLifecycle(
+      server,
+      `Server ${opts?.kill ? "killed" : "stopped"} — ${server.name}`,
+      `${server.name} is no longer running.`,
+    );
   });
 }
 
@@ -571,6 +603,7 @@ export async function deleteServerWipe(serverId: string) {
       .where(eq(serverPermissions.serverId, serverId))
       .run();
     db.delete(servers).where(eq(servers.id, serverId)).run();
+    notifyLifecycle(server, `Server deleted — ${server.name}`, `${server.name} was permanently removed.`);
   });
 }
 

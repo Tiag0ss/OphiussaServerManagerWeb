@@ -536,10 +536,16 @@ export function FilesBrowser({
   }
 
   function onKey(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const target = e.target as HTMLElement;
     if (
-      e.target instanceof HTMLInputElement ||
-      e.target instanceof HTMLTextAreaElement
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target.isContentEditable ||
+      target.closest(".cm-editor")
     ) {
+      // Native inputs, textareas, and rich editors (e.g. the CodeMirror file
+      // editor modal) must keep their own copy/paste/select-all — don't let
+      // this file-browser-wide shortcut handler steal them.
       return;
     }
     if (e.altKey && e.key === "ArrowLeft") {

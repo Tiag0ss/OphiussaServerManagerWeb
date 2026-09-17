@@ -2,6 +2,7 @@
 
 import { Maximize2, Minimize2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "./button";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +58,13 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  // Render at the document root instead of wherever this Modal happens to be
+  // mounted, so it isn't clipped/stacked incorrectly by an ancestor's
+  // overflow/z-index/transform (e.g. the files browser's scrollable panes).
+  // Note: React still bubbles events through the *component* tree for
+  // portals, not the DOM tree — this doesn't by itself stop an ancestor's
+  // keydown handler from seeing keys pressed inside the modal.
+  return createPortal(
     <div
       className={cn(
         "fixed inset-0 z-50 flex",
@@ -130,6 +137,7 @@ export function Modal({
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

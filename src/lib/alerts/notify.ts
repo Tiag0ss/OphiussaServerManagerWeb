@@ -10,7 +10,7 @@ export type AlertPayload = {
   meta?: Record<string, unknown>;
 };
 
-async function sendDiscord(webhook: string, payload: AlertPayload) {
+export async function sendDiscord(webhook: string, payload: AlertPayload) {
   const res = await fetch(webhook, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
