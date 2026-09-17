@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { rmSync, mkdirSync, existsSync } from "fs";
 import { nanoid } from "nanoid";
 import { getDb } from "../db";
@@ -176,11 +176,52 @@ export async function reallocatePorts(
   const tpl = getTemplate(server.templateId);
   if (!tpl) throw new Error("Template not found");
 
+  // A manually-configured RCON port isn't part of the template's own port
+  // list, so it would otherwise be dropped by the wholesale delete below.
+  const manualRcon = server.rconEnabled
+    ? db
+        .select()
+        .from(allocations)
+        .where(and(eq(allocations.serverId, serverId), eq(allocations.key, "rcon")))
+        .get()
+    : null;
+
   db.delete(allocations).where(eq(allocations.serverId, serverId)).run();
-  return allocatePorts(tpl, serverId, {
+  const created = await allocatePorts(tpl, serverId, {
     ownerId: server.ownerId,
     preferred,
   });
+  if (manualRcon) {
+    db.insert(allocations).values(manualRcon).run();
+    created.push(manualRcon);
+  }
+  return created;
+}
+
+/**
+ * Publish (or unpublish) a manually-configured RCON port for a server whose
+ * template has no native RCON support (e.g. added via a mod). Reuses the
+ * `allocations` table under the same "rcon" key the native RCON path uses,
+ * so `sendRcon` needs no special-casing — host and container port are the
+ * same value since we don't know the template's own port scheme.
+ */
+export async function setManualRconPort(serverId: string, port: number | null) {
+  const db = getDb();
+  db.delete(allocations)
+    .where(and(eq(allocations.serverId, serverId), eq(allocations.key, "rcon")))
+    .run();
+  if (port != null) {
+    db.insert(allocations)
+      .values({
+        id: nanoid(),
+        serverId,
+        hostPort: port,
+        containerPort: port,
+        protocol: "tcp",
+        key: "rcon",
+      })
+      .run();
+  }
 }
 
 export async function createServerContainer(serverId: string) {
@@ -237,12 +278,15 @@ async function createServerContainerUnlocked(serverId: string) {
           );
         },
       );
-    }).catch(async () => {
+    }).catch(async (pullErr: Error) => {
       // image may already exist locally
       try {
         await docker.getImage(tpl.runtime.image).inspect();
       } catch {
-        throw new Error(`Failed to pull image ${tpl.runtime.image}`);
+        console.error(`[docker] pull failed for ${tpl.runtime.image}:`, pullErr);
+        throw new Error(
+          `Failed to pull image ${tpl.runtime.image}: ${pullErr.message}`,
+        );
       }
     });
 

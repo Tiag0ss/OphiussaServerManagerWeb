@@ -64,9 +64,9 @@ export async function checkServerHealth(serverId: string): Promise<HealthStatus>
   }
 
   let rconStatus: HealthStatus["rcon"] = "skipped";
-  if (tpl?.rcon?.enabled) {
+  if (tpl?.rcon?.enabled || server.rconEnabled) {
     try {
-      const cmd = tpl.rcon.saveCommand || "help";
+      const cmd = tpl?.rcon?.saveCommand || "help";
       await sendRcon(serverId, cmd);
       rconStatus = "ok";
     } catch {

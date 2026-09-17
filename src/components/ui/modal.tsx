@@ -77,16 +77,18 @@ export function Modal({
           "relative z-10 flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl",
           maximized
             ? "h-full max-h-none max-w-none"
-            : cn(
-                "max-h-[90vh] overflow-y-auto p-5",
-                wide ? "max-w-2xl" : "max-w-lg",
-              ),
+            : fill
+              ? cn("h-[80vh] max-h-[80vh]", wide ? "max-w-2xl" : "max-w-lg")
+              : cn(
+                  "max-h-[90vh] overflow-y-auto p-5",
+                  wide ? "max-w-2xl" : "max-w-lg",
+                ),
         )}
       >
         <div
           className={cn(
             "flex shrink-0 items-center justify-between gap-3 border-border",
-            maximized ? "border-b px-4 py-3" : "mb-4",
+            maximized || fill ? "border-b px-4 py-3" : "mb-4",
           )}
         >
           <div className="min-w-0 flex-1">
@@ -122,7 +124,7 @@ export function Modal({
         <div
           className={cn(
             fill && "flex min-h-0 flex-1 flex-col overflow-hidden",
-            maximized ? "px-4 pb-4 pt-0" : fill && "min-h-0",
+            (maximized || fill) && "px-4 pb-4 pt-0",
           )}
         >
           {children}

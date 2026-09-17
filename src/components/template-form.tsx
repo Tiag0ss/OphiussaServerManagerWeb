@@ -6,21 +6,32 @@ import { evaluateShowIf } from "@/lib/templates/show-if";
 import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { SecretInput } from "@/components/ui/secret-input";
+import { TabBar } from "@/components/ui/tab-bar";
 
 type Props = {
   template: GameTemplate;
   value: Record<string, unknown>;
   onChange: (next: Record<string, unknown>) => void;
   mode?: "simple" | "advanced" | "all";
+  ports?: Record<string, number>;
+  portRange?: { start: number; end: number };
+  onPortChange?: (key: string, value: number) => void;
 };
+
+const PORTS_GROUP = "Ports";
 
 export function TemplateForm({
   template,
   value,
   onChange,
   mode = "all",
+  ports,
+  portRange,
+  onPortChange,
 }: Props) {
-  const groups = useMemo(() => {
+  const showPorts = Boolean(ports && portRange && onPortChange);
+
+  const fieldGroups = useMemo(() => {
     const map = new Map<string, TemplateField[]>();
     for (const field of template.fields) {
       if (field.type === "group") continue;
@@ -33,6 +44,18 @@ export function TemplateForm({
     }
     return [...map.entries()];
   }, [template, mode]);
+
+  const groups = useMemo(() => {
+    if (!showPorts) return fieldGroups;
+    const portsEntry: [string, TemplateField[]] = [PORTS_GROUP, []];
+    const serverIdx = fieldGroups.findIndex(([g]) => g === "Server");
+    const insertAt = serverIdx === -1 ? 0 : serverIdx + 1;
+    return [
+      ...fieldGroups.slice(0, insertAt),
+      portsEntry,
+      ...fieldGroups.slice(insertAt),
+    ];
+  }, [showPorts, fieldGroups]);
 
   const [activeGroup, setActiveGroup] = useState(groups[0]?.[0] || "General");
 
@@ -52,37 +75,52 @@ export function TemplateForm({
   return (
     <div className="space-y-4">
       {groups.length > 1 && (
-        <div className="flex flex-wrap gap-2 border-b border-border pb-3">
-          {groups.map(([g]) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setActiveGroup(g)}
-              className={`rounded-md px-3 py-1.5 text-sm ${
-                activeGroup === g
-                  ? "bg-accent text-accent-fg"
-                  : "bg-card-elevated text-muted hover:text-foreground"
-              }`}
-            >
-              {g}
-            </button>
-          ))}
+        <TabBar
+          tabs={groups.map(([g]) => g)}
+          value={activeGroup}
+          onChange={setActiveGroup}
+        />
+      )}
+      {activeGroup === PORTS_GROUP && showPorts ? (
+        <div className="space-y-2">
+          <p className="text-xs text-muted">
+            Allowed range {portRange!.start}–{portRange!.end}. Consecutive
+            ports are suggested automatically; change them within your
+            allowed range.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {template.runtime.ports.map((p) => (
+              <div key={p.key}>
+                <Label className="text-xs">
+                  {p.key} → container {p.container}/{p.protocol}
+                </Label>
+                <Input
+                  type="number"
+                  min={portRange!.start}
+                  max={portRange!.end}
+                  value={ports![p.key] ?? ""}
+                  onChange={(e) => onPortChange!(p.key, Number(e.target.value))}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {fields.map((field) => {
+            if (!evaluateShowIf(field, value)) return null;
+            return (
+              <FieldControl
+                key={field.key}
+                field={field}
+                template={template}
+                value={value[field.key]}
+                onChange={(v) => setField(field.key, v)}
+              />
+            );
+          })}
         </div>
       )}
-      <div className="grid gap-4 md:grid-cols-2">
-        {fields.map((field) => {
-          if (!evaluateShowIf(field, value)) return null;
-          return (
-            <FieldControl
-              key={field.key}
-              field={field}
-              template={template}
-              value={value[field.key]}
-              onChange={(v) => setField(field.key, v)}
-            />
-          );
-        })}
-      </div>
     </div>
   );
 }

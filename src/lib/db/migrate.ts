@@ -40,6 +40,7 @@ const STATEMENTS = [
     ftp_enabled INTEGER NOT NULL DEFAULT 1,
     ftp_username TEXT,
     ftp_password_hash TEXT,
+    rcon_enabled INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
@@ -128,6 +129,7 @@ const ALTERS = [
   `ALTER TABLE templates ADD COLUMN source TEXT NOT NULL DEFAULT 'builtin'`,
   `ALTER TABLE backups ADD COLUMN label TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE servers ADD COLUMN ftp_password_enc TEXT`,
+  `ALTER TABLE servers ADD COLUMN rcon_enabled INTEGER NOT NULL DEFAULT 0`,
 ];
 
 export function migrate(sqlite: Database.Database) {
