@@ -17,6 +17,7 @@ type TplMeta = {
   source?: string;
   updatedAt?: string;
   mods?: { providers?: string[] };
+  tested?: boolean;
 };
 
 export default function TemplatesPage() {
@@ -232,7 +233,18 @@ export default function TemplatesPage() {
                       : "hover:bg-card-elevated"
                   }`}
                 >
-                  <p className="font-medium">{t.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium">{t.name}</p>
+                    <span
+                      className={
+                        t.tested
+                          ? "rounded border border-ok/30 bg-ok/15 px-1 py-0.5 text-[9px] font-medium uppercase text-ok"
+                          : "rounded border border-warn/30 bg-warn/15 px-1 py-0.5 text-[9px] font-medium uppercase text-warn"
+                      }
+                    >
+                      {t.tested ? "Tested" : "Untested"}
+                    </span>
+                  </div>
                   <p className="text-xs text-muted">
                     {t.id} · {t.source || "builtin"}
                   </p>

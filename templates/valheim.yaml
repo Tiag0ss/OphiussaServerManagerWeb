@@ -1,6 +1,7 @@
 id: valheim
 name: Valheim
 description: Valheim dedicated server (lloesche) — seed, modifiers, BepInEx / ValheimPlus, backups
+tested: true
 runtime:
   image: ghcr.io/lloesche/valheim-server
   stopTimeout: 90

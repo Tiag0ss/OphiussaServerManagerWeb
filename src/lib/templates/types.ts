@@ -113,6 +113,8 @@ export type GameTemplate = {
   name: string;
   description?: string;
   icon?: string;
+  /** Has this template been verified working end-to-end? Defaults to false/untested when omitted. */
+  tested?: boolean;
   runtime: {
     image: string;
     stopTimeout?: number;

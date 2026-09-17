@@ -130,9 +130,25 @@ export default function NewServerPage() {
               }}
               className="rounded-xl border border-border bg-card p-4 text-left hover:border-accent"
             >
-              <h3 className="font-semibold">{t.name}</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold">{t.name}</h3>
+                <span
+                  className={
+                    t.tested
+                      ? "rounded border border-ok/30 bg-ok/15 px-1.5 py-0.5 text-[10px] font-medium uppercase text-ok"
+                      : "rounded border border-warn/30 bg-warn/15 px-1.5 py-0.5 text-[10px] font-medium uppercase text-warn"
+                  }
+                >
+                  {t.tested ? "Tested" : "Untested"}
+                </span>
+              </div>
               <p className="mt-1 text-sm text-muted">{t.description}</p>
               <p className="mt-2 text-xs text-accent">{modsLabel(t)}</p>
+              {!t.tested && (
+                <p className="mt-1 text-xs text-warn">
+                  Not yet verified end-to-end — may have rough edges.
+                </p>
+              )}
             </button>
           ))}
         </div>
