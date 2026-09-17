@@ -84,12 +84,14 @@ export default function ServerDetailPage() {
   >("overview");
   const [config, setConfig] = useState<Record<string, unknown>>({});
   const [logs, setLogs] = useState("");
+  const [rconLog, setRconLog] = useState("");
   const [command, setCommand] = useState("");
   const [memoryMb, setMemoryMb] = useState(2048);
   const [cpuLimit, setCpuLimit] = useState(1);
   const [portDraft, setPortDraft] = useState<Record<string, number>>({});
   const [resourceBusy, setResourceBusy] = useState(false);
   const [consoleRef, setConsoleRef] = useState<HTMLPreElement | null>(null);
+  const [rconRef, setRconRef] = useState<HTMLPreElement | null>(null);
   const [mods, setMods] = useState<
     Array<{
       id: string;
@@ -184,6 +186,11 @@ export default function ServerDetailPage() {
     if (!consoleRef) return;
     consoleRef.scrollTop = consoleRef.scrollHeight;
   }, [logs, consoleRef]);
+
+  useEffect(() => {
+    if (!rconRef) return;
+    rconRef.scrollTop = rconRef.scrollHeight;
+  }, [rconLog, rconRef]);
 
   useEffect(() => {
     if (tab !== "mods") return;
@@ -697,24 +704,49 @@ export default function ServerDetailPage() {
 
       {tab === "console" && (
         <Card className="space-y-3">
-          <pre
-            ref={setConsoleRef}
-            className="h-80 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-ok"
-          >
-            {logs || "Waiting for logs…"}
-          </pre>
+          <div>
+            <Label className="text-xs text-muted">Container logs</Label>
+            <pre
+              ref={setConsoleRef}
+              className="mt-1 h-64 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-ok"
+            >
+              {logs || "Waiting for logs…"}
+            </pre>
+          </div>
+          <div>
+            <Label className="text-xs text-muted">RCON</Label>
+            <pre
+              ref={setRconRef}
+              className="mt-1 h-40 overflow-auto rounded-lg border border-border bg-[#06090e] p-3 font-mono text-xs text-accent"
+            >
+              {rconLog || "No commands sent yet."}
+            </pre>
+          </div>
           <form
             className="flex gap-2"
             onSubmit={async (e) => {
               e.preventDefault();
+              const sent = command;
               const res = await fetch(`/api/servers/${id}/console`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ command }),
+                body: JSON.stringify({ command: sent }),
               });
+              const j = await res.json().catch(() => ({}));
               if (!res.ok) {
-                const j = await res.json().catch(() => ({}));
                 setMessage(j.error || "Command failed");
+                setRconLog((prev) =>
+                  (prev + `> ${sent}\nError: ${j.error || "Command failed"}\n`).slice(
+                    -50000,
+                  ),
+                );
+              } else {
+                setRconLog((prev) =>
+                  (
+                    prev +
+                    `> ${sent}\n${j.result?.trim() ? j.result : "(no response)"}\n`
+                  ).slice(-50000),
+                );
               }
               setCommand("");
             }}

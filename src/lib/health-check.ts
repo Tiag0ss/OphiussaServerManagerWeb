@@ -58,7 +58,10 @@ export async function checkServerHealth(serverId: string): Promise<HealthStatus>
   const gamePort =
     ports.find((p) => p.key === "game" || p.key === "server") ?? ports[0];
   let gamePortStatus: HealthStatus["gamePort"] = "skipped";
-  if (gamePort) {
+  if (gamePort && gamePort.protocol === "tcp") {
+    // UDP ports (common for game traffic, e.g. Valheim) can't be reliably
+    // probed with a TCP connect — it always fails, so leave those "skipped"
+    // instead of falsely reporting them closed.
     const open = await probeTcp("127.0.0.1", gamePort.hostPort);
     gamePortStatus = open ? "open" : "closed";
   }
