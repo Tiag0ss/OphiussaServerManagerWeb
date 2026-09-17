@@ -37,6 +37,7 @@ docker run -d --name "${NAME}" --restart unless-stopped \
   -p "${SFTP_PORT}:2022" \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "${DATA_DIR}:/data" \
+  -e HOST_DATA_DIR="${DATA_DIR}" \
   "${IMAGE}"
 
 echo
