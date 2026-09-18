@@ -121,6 +121,15 @@ export default function ServerDetailPage() {
       createdAt: string;
     }>
   >([]);
+  const [containerBackups, setContainerBackups] = useState<
+    Array<{
+      id: string;
+      name: string;
+      sizeBytes: number | null;
+      isDirectory: boolean;
+      createdAt: string;
+    }>
+  >([]);
   const [scheduleList, setScheduleList] = useState<
     Array<{ id: string; name: string; cron: string; action: string }>
   >([]);
@@ -203,7 +212,10 @@ export default function ServerDetailPage() {
     if (tab !== "backups") return;
     fetch(`/api/servers/${id}/backups`)
       .then((r) => r.json())
-      .then((d) => setBackups(d.backups || []));
+      .then((d) => {
+        setBackups(d.backups || []);
+        setContainerBackups(d.containerBackups || []);
+      });
   }, [tab, id]);
 
   useEffect(() => {
@@ -1125,6 +1137,59 @@ export default function ServerDetailPage() {
                         body: JSON.stringify({ backupId: b.id }),
                       });
                       setBackups((prev) => prev.filter((x) => x.id !== b.id));
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </li>
+            ))}
+            {backups.length === 0 && (
+              <li className="text-muted">No panel backups yet</li>
+            )}
+          </ul>
+        </Card>
+      )}
+
+      {tab === "backups" && containerBackups.length > 0 && (
+        <Card className="mt-4 space-y-3">
+          <div>
+            <h3 className="font-medium">Game auto-backups</h3>
+            <p className="text-sm text-muted">
+              Created by the game server itself (Maintenance settings), not
+              tracked by the panel. Read-only here — delete or download only.
+            </p>
+          </div>
+          <ul className="space-y-2 text-sm">
+            {containerBackups.map((b) => (
+              <li key={b.id} className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate">
+                  <span className="font-medium">{b.name}</span>
+                  <span className="text-muted">
+                    {" "}
+                    · {b.isDirectory ? "folder" : `${Math.round((b.sizeBytes ?? 0) / 1024)} KB`} ·{" "}
+                    {new Date(b.createdAt).toLocaleString()}
+                  </span>
+                </span>
+                <div className="flex shrink-0 gap-2">
+                  {!b.isDirectory && (
+                    <a
+                      href={`/api/servers/${id}/backups/${encodeURIComponent(b.id)}/download`}
+                      className="inline-flex items-center rounded-lg border border-border bg-card-elevated px-2.5 py-1.5 text-sm hover:border-accent/40"
+                    >
+                      Download
+                    </a>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      await fetch(`/api/servers/${id}/backups`, {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ backupId: b.id }),
+                      });
+                      setContainerBackups((prev) => prev.filter((x) => x.id !== b.id));
                     }}
                   >
                     Delete
