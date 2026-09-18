@@ -36,31 +36,15 @@ import {
 } from "./client";
 import { withServerLock } from "./locks";
 import { sendRcon } from "../rcon/client";
-import { dispatchAlert, sendDiscord } from "../alerts/notify";
+import { notifyServerEvent } from "../alerts/notify";
 
-/**
- * Fire-and-forget: a webhook hiccup must never fail a start/stop/etc.
- * Also posts directly to a server's own "Discord webhook URL" config field
- * when set — several templates expose that field bound to a container env
- * var the underlying game image doesn't actually implement, so this is the
- * only thing that makes it do anything.
- */
+/** Fire-and-forget: a webhook hiccup must never fail a start/stop/etc. */
 function notifyLifecycle(
   server: { name: string; configJson: string },
   title: string,
   message: string,
 ) {
-  dispatchAlert({ title, message, severity: "info" }).catch(() => undefined);
-  try {
-    const config = JSON.parse(server.configJson) as Record<string, unknown>;
-    const url =
-      typeof config.discordWebhook === "string" ? config.discordWebhook.trim() : "";
-    if (url) {
-      sendDiscord(url, { title, message, severity: "info" }).catch(() => undefined);
-    }
-  } catch {
-    /* malformed config — global alert above still fired */
-  }
+  notifyServerEvent(server, { title, message, severity: "info" });
 }
 
 /** Docker container names: [a-zA-Z0-9][a-zA-Z0-9_.-]* and typically ≤63 chars. */

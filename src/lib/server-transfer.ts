@@ -14,7 +14,7 @@ import {
 import { assertCanCreateServer } from "./quotas";
 import { getTemplate } from "./templates/load";
 import { serverDataDir } from "./paths";
-import { dispatchAlert, sendDiscord } from "./alerts/notify";
+import { notifyServerEvent } from "./alerts/notify";
 
 export async function cloneServer(
   user: SessionUser,
@@ -73,20 +73,14 @@ export async function cloneServer(
     await startServer(id);
   }
 
-  const installTitle = `Server installed — ${opts.name}`;
-  const installMessage = `${opts.name} (${tpl.name}) was cloned from ${source.name} by ${user.email}.`;
-  dispatchAlert({
-    title: installTitle,
-    message: installMessage,
-    severity: "info",
-  }).catch(() => undefined);
-  if (typeof config.discordWebhook === "string" && config.discordWebhook.trim()) {
-    sendDiscord(config.discordWebhook.trim(), {
-      title: installTitle,
-      message: installMessage,
+  notifyServerEvent(
+    { name: opts.name, configJson: JSON.stringify(config) },
+    {
+      title: `Server installed — ${opts.name}`,
+      message: `${opts.name} (${tpl.name}) was cloned from ${source.name} by ${user.email}.`,
       severity: "info",
-    }).catch(() => undefined);
-  }
+    },
+  );
 
   return { id, ftpUsername, ftpPassword };
 }

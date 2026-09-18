@@ -129,6 +129,30 @@ export async function dispatchAlertDeduped(
     .run();
 }
 
+/**
+ * Fire-and-forget: send both the global panel alert channels AND, if this
+ * server has its own "Discord webhook URL" config field set, post directly
+ * there too. Several game templates expose that field bound to a container
+ * env var the underlying image doesn't actually implement (see valheim.yaml),
+ * so this is what makes a per-server webhook actually do something.
+ */
+export function notifyServerEvent(
+  server: { name: string; configJson: string },
+  payload: AlertPayload,
+) {
+  dispatchAlert(payload).catch(() => undefined);
+  try {
+    const config = JSON.parse(server.configJson) as Record<string, unknown>;
+    const url =
+      typeof config.discordWebhook === "string" ? config.discordWebhook.trim() : "";
+    if (url) {
+      sendDiscord(url, payload).catch(() => undefined);
+    }
+  } catch {
+    /* malformed config — global alert above still fired */
+  }
+}
+
 export async function sendTestAlert() {
   await dispatchAlert({
     title: "Test alert",

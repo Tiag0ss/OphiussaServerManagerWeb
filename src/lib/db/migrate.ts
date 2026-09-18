@@ -88,8 +88,11 @@ const STATEMENTS = [
     name TEXT NOT NULL,
     cron TEXT NOT NULL,
     action TEXT NOT NULL,
+    command_text TEXT,
     enabled INTEGER NOT NULL DEFAULT 1,
-    last_run_at INTEGER
+    last_run_at INTEGER,
+    last_run_status TEXT,
+    last_run_error TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS metric_samples (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,6 +133,9 @@ const ALTERS = [
   `ALTER TABLE backups ADD COLUMN label TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE servers ADD COLUMN ftp_password_enc TEXT`,
   `ALTER TABLE servers ADD COLUMN rcon_enabled INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE schedules ADD COLUMN command_text TEXT`,
+  `ALTER TABLE schedules ADD COLUMN last_run_status TEXT`,
+  `ALTER TABLE schedules ADD COLUMN last_run_error TEXT`,
 ];
 
 export function migrate(sqlite: Database.Database) {

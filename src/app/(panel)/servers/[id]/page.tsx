@@ -131,8 +131,20 @@ export default function ServerDetailPage() {
     }>
   >([]);
   const [scheduleList, setScheduleList] = useState<
-    Array<{ id: string; name: string; cron: string; action: string }>
+    Array<{
+      id: string;
+      name: string;
+      cron: string;
+      action: string;
+      commandText?: string | null;
+      enabled: boolean;
+      lastRunAt?: string | null;
+      lastRunStatus?: "ok" | "fail" | null;
+      lastRunError?: string | null;
+    }>
   >([]);
+  const [scheduleBusy, setScheduleBusy] = useState<string | null>(null);
+  const [newScheduleAction, setNewScheduleAction] = useState("backup");
   const [confirmName, setConfirmName] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -1215,24 +1227,31 @@ export default function ServerDetailPage() {
       {tab === "schedules" && (
         <Card className="space-y-3">
           <form
-            className="grid gap-2 md:grid-cols-4"
+            className="grid gap-2 md:grid-cols-5"
             onSubmit={async (e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
-              await fetch(`/api/servers/${id}/schedules`, {
+              const res = await fetch(`/api/servers/${id}/schedules`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   name: fd.get("name"),
                   cron: fd.get("cron"),
                   action: fd.get("action"),
+                  commandText: fd.get("commandText"),
                 }),
               });
+              const j = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                setMessage(j.error || "Could not add schedule");
+                return;
+              }
               const list = await fetch(`/api/servers/${id}/schedules`).then(
                 (r) => r.json(),
               );
               setScheduleList(list.schedules || []);
               e.currentTarget.reset();
+              setNewScheduleAction("backup");
             }}
           >
             <Input name="name" placeholder="Name" required />
@@ -1240,39 +1259,124 @@ export default function ServerDetailPage() {
             <select
               name="action"
               className="rounded-md border border-border bg-card px-3 py-2 text-sm"
-              defaultValue="backup"
+              value={newScheduleAction}
+              onChange={(e) => setNewScheduleAction(e.target.value)}
             >
               <option value="start">start</option>
               <option value="stop">stop</option>
               <option value="restart">restart</option>
               <option value="backup">backup</option>
+              <option value="update-image">update image</option>
+              <option value="rcon">rcon command</option>
             </select>
+            {newScheduleAction === "rcon" ? (
+              <Input
+                name="commandText"
+                placeholder="RCON command"
+                required
+                className="md:col-span-1"
+              />
+            ) : (
+              <input type="hidden" name="commandText" value="" />
+            )}
             <Button type="submit">Add</Button>
           </form>
           <ul className="space-y-2 text-sm">
             {scheduleList.map((s) => (
-              <li key={s.id} className="flex justify-between">
-                <span>
-                  {s.name} · <code>{s.cron}</code> · {s.action}
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={async () => {
-                    await fetch(`/api/servers/${id}/schedules`, {
-                      method: "DELETE",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ scheduleId: s.id }),
-                    });
-                    setScheduleList((prev) =>
-                      prev.filter((x) => x.id !== s.id),
-                    );
-                  }}
-                >
-                  Remove
-                </Button>
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0"
+              >
+                <div className="min-w-0">
+                  <span>
+                    <label className="mr-2 inline-flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={s.enabled}
+                        onChange={async (e) => {
+                          const enabled = e.target.checked;
+                          setScheduleList((prev) =>
+                            prev.map((x) =>
+                              x.id === s.id ? { ...x, enabled } : x,
+                            ),
+                          );
+                          await fetch(`/api/servers/${id}/schedules`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ scheduleId: s.id, enabled }),
+                          });
+                        }}
+                      />
+                    </label>
+                    {s.name} · <code>{s.cron}</code> · {s.action}
+                    {s.action === "rcon" && s.commandText
+                      ? ` (${s.commandText})`
+                      : ""}
+                  </span>
+                  <p className="text-xs text-muted">
+                    {s.lastRunAt
+                      ? `Last run ${new Date(s.lastRunAt).toLocaleString()} — ${
+                          s.lastRunStatus === "fail"
+                            ? `failed: ${s.lastRunError || "unknown error"}`
+                            : "ok"
+                        }`
+                      : "Never run yet"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={scheduleBusy === s.id}
+                    onClick={async () => {
+                      setScheduleBusy(s.id);
+                      setMessage(`Running "${s.name}"…`);
+                      const res = await fetch(`/api/servers/${id}/schedules`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "run-now",
+                          scheduleId: s.id,
+                        }),
+                      });
+                      const j = await res.json().catch(() => ({}));
+                      setScheduleBusy(null);
+                      if (!res.ok) {
+                        setMessage(j.error || "Run failed");
+                        return;
+                      }
+                      setMessage(`Ran "${s.name}"`);
+                      if (j.schedule) {
+                        setScheduleList((prev) =>
+                          prev.map((x) => (x.id === s.id ? j.schedule : x)),
+                        );
+                      }
+                    }}
+                  >
+                    {scheduleBusy === s.id ? "Running…" : "Run now"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      await fetch(`/api/servers/${id}/schedules`, {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ scheduleId: s.id }),
+                      });
+                      setScheduleList((prev) =>
+                        prev.filter((x) => x.id !== s.id),
+                      );
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
               </li>
             ))}
+            {scheduleList.length === 0 && (
+              <li className="text-muted">No schedules yet</li>
+            )}
           </ul>
         </Card>
       )}
