@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { FilesBrowser } from "@/components/files-browser";
-import { TemplateForm } from "@/components/template-form";
+import { TemplateForm, computeFieldGroups } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
 import { CopyJoinButton } from "@/components/copy-join-button";
@@ -20,6 +20,12 @@ import { ServerPermissionsPanel } from "@/components/servers/server-permissions-
 import { ServerTransferPanel } from "@/components/servers/server-transfer-panel";
 import { TabBar } from "@/components/ui/tab-bar";
 import { Modal } from "@/components/ui/modal";
+import { CronInput } from "@/components/ui/cron-input";
+import {
+  StickyActionBar,
+  STICKY_ACTION_BAR_CLEARANCE,
+} from "@/components/ui/sticky-action-bar";
+import { cn } from "@/lib/utils";
 
 type QuotaHeadroom = {
   maxServers: number;
@@ -121,18 +127,40 @@ export default function ServerDetailPage() {
       createdAt: string;
     }>
   >([]);
-  const [scheduleList, setScheduleList] = useState<
-    Array<{ id: string; name: string; cron: string; action: string }>
+  const [containerBackups, setContainerBackups] = useState<
+    Array<{
+      id: string;
+      name: string;
+      sizeBytes: number | null;
+      isDirectory: boolean;
+      createdAt: string;
+    }>
   >([]);
+  const [scheduleList, setScheduleList] = useState<
+    Array<{
+      id: string;
+      name: string;
+      cron: string;
+      action: string;
+      commandText?: string | null;
+      enabled: boolean;
+      lastRunAt?: string | null;
+      lastRunStatus?: "ok" | "fail" | null;
+      lastRunError?: string | null;
+    }>
+  >([]);
+  const [scheduleBusy, setScheduleBusy] = useState<string | null>(null);
+  const [newScheduleName, setNewScheduleName] = useState("");
+  const [newScheduleCron, setNewScheduleCron] = useState("0 4 * * *");
+  const [newScheduleAction, setNewScheduleAction] = useState("backup");
+  const [newScheduleCommand, setNewScheduleCommand] = useState("");
   const [confirmName, setConfirmName] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [ftpPassword, setFtpPassword] = useState<string | null>(null);
   const [ftpResetBusy, setFtpResetBusy] = useState(false);
-  const [configTab, setConfigTab] = useState<"game" | "network" | "rcon">(
-    "game",
-  );
+  const [configTab, setConfigTab] = useState<string>("");
   const [rconEnabled, setRconEnabled] = useState(false);
   const [rconPort, setRconPort] = useState(25575);
   const [rconPassword, setRconPassword] = useState("");
@@ -169,6 +197,13 @@ export default function ServerDetailPage() {
   }, [load]);
 
   useEffect(() => {
+    if (!data) return;
+    const groups = computeFieldGroups(data.template, "all").map(([g]) => g);
+    const valid = [...groups, "network", "rcon"];
+    setConfigTab((cur) => (valid.includes(cur) ? cur : groups[0] || "network"));
+  }, [data]);
+
+  useEffect(() => {
     if (tab !== "console") return;
     const es = new EventSource(`/api/servers/${id}/logs`);
     es.onmessage = (ev) => {
@@ -203,7 +238,10 @@ export default function ServerDetailPage() {
     if (tab !== "backups") return;
     fetch(`/api/servers/${id}/backups`)
       .then((r) => r.json())
-      .then((d) => setBackups(d.backups || []));
+      .then((d) => {
+        setBackups(d.backups || []);
+        setContainerBackups(d.containerBackups || []);
+      });
   }, [tab, id]);
 
   useEffect(() => {
@@ -244,17 +282,40 @@ export default function ServerDetailPage() {
     }
   }
 
+  async function createBackup() {
+    setMessage("Creating backup…");
+    const res = await fetch(`/api/servers/${id}/backups`, {
+      method: "POST",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMessage(j.error || "Backup failed");
+      return;
+    }
+    const list = await fetch(`/api/servers/${id}/backups`).then((r) => r.json());
+    setBackups(list.backups || []);
+    const mb = ((j.sizeBytes || 0) / 1024 / 1024).toFixed(2);
+    setMessage(
+      `Backup created (${mb} MB${j.entries?.length ? ` · ${j.entries.join(", ")}` : ""})`,
+    );
+  }
+
   async function saveConfig() {
     const res = await fetch(`/api/servers/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ config, recreate: true }),
+      body: JSON.stringify({ config }),
     });
     if (!res.ok) {
       const j = await res.json();
       setMessage(j.error || "Save failed");
     } else {
-      setMessage("Saved and container recreated");
+      const j = await res.json().catch(() => ({}));
+      setMessage(
+        j.recreated
+          ? "Saved and container recreated"
+          : "Saved — no changes affecting the container",
+      );
       load();
     }
   }
@@ -322,6 +383,10 @@ export default function ServerDetailPage() {
     router.refresh();
   }
 
+  const gameGroups = data
+    ? computeFieldGroups(data.template, "all").map(([g]) => g)
+    : [];
+
   if (!data) {
     return <p className="text-sm text-muted">Loading…</p>;
   }
@@ -338,60 +403,75 @@ export default function ServerDetailPage() {
     "danger",
   ] as const;
 
+  const footerAction =
+    tab === "config" && gameGroups.includes(configTab) ? (
+      <Button size="sm" onClick={saveConfig}>
+        Save & recreate container
+      </Button>
+    ) : tab === "backups" ? (
+      <Button size="sm" onClick={createBackup}>
+        Create backup
+      </Button>
+    ) : null;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted">
-            <Link href="/dashboard" className="hover:underline">
-              Dashboard
-            </Link>{" "}
-            / {data.server.name}
-          </p>
-          <h2 className="text-2xl font-semibold">{data.server.name}</h2>
-          <div className="mt-2">
-            <ServerHealthBadge serverId={id} />
+    <div className={cn("space-y-6", footerAction && STICKY_ACTION_BAR_CLEARANCE)}>
+      <div className="sticky top-0 z-30 -mx-4 space-y-4 border-b border-border bg-background/95 px-4 pb-0 pt-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted">
+              <Link href="/dashboard" className="hover:underline">
+                Dashboard
+              </Link>{" "}
+              / {data.server.name}
+            </p>
+            <h2 className="text-2xl font-semibold">{data.server.name}</h2>
+            <div className="mt-2">
+              <ServerHealthBadge serverId={id} />
+            </div>
+            <p className="mt-2 text-sm text-muted">
+              {data.template.name}
+              {data.ownerName ? ` · owner ${data.ownerName}` : ""} ·{" "}
+              {data.server.status}
+              {data.stats
+                ? ` · CPU ${data.stats.cpuPercent}% · RAM ${data.stats.memoryMb} MB`
+                : ""}
+            </p>
+            {data.containerName && (
+              <p className="font-mono text-xs text-muted">
+                docker: {data.containerName}
+                {data.dockerNetwork ? ` · net ${data.dockerNetwork}` : ""}
+              </p>
+            )}
+            {data.dockerSocket && (
+              <p className="text-xs text-muted" title={data.dockerSocket}>
+                Engine socket: {data.dockerSocket.replace(/^\/home\/[^/]+/, "~")}
+                {data.dockerSocket.includes("desktop")
+                  ? " (Docker Desktop)"
+                  : " (system Engine — use: docker context use default)"}
+              </p>
+            )}
           </div>
-          <p className="mt-2 text-sm text-muted">
-            {data.template.name}
-            {data.ownerName ? ` · owner ${data.ownerName}` : ""} ·{" "}
-            {data.server.status}
-            {data.stats
-              ? ` · CPU ${data.stats.cpuPercent}% · RAM ${data.stats.memoryMb} MB`
-              : ""}
-          </p>
-          {data.containerName && (
-            <p className="font-mono text-xs text-muted">
-              docker: {data.containerName}
-              {data.dockerNetwork ? ` · net ${data.dockerNetwork}` : ""}
-            </p>
-          )}
-          {data.dockerSocket && (
-            <p className="text-xs text-muted" title={data.dockerSocket}>
-              Engine socket: {data.dockerSocket.replace(/^\/home\/[^/]+/, "~")}
-              {data.dockerSocket.includes("desktop")
-                ? " (Docker Desktop)"
-                : " (system Engine — use: docker context use default)"}
-            </p>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <CopyJoinButton
+              address={joinAddress(data.publicIp, data.ports)}
+            />
+            <Button size="sm" onClick={() => action("start")}>
+              Start
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => action("stop")}>
+              Stop
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => action("restart")}>
+              Restart
+            </Button>
+            <Button size="sm" variant="danger" onClick={() => action("kill")}>
+              Kill
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <CopyJoinButton
-            address={joinAddress(data.publicIp, data.ports)}
-          />
-          <Button size="sm" onClick={() => action("start")}>
-            Start
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => action("stop")}>
-            Stop
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => action("restart")}>
-            Restart
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => action("kill")}>
-            Kill
-          </Button>
-        </div>
+
+        <TabBar tabs={tabs} value={tab} onChange={setTab} className="border-b-0" />
       </div>
 
       {message && (
@@ -399,8 +479,6 @@ export default function ServerDetailPage() {
           {message}
         </p>
       )}
-
-      <TabBar tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === "overview" && (
         <div className="space-y-4">
@@ -416,21 +494,22 @@ export default function ServerDetailPage() {
       {tab === "config" && (
         <div className="space-y-4">
           <TabBar
-            tabs={["game", "network", "rcon"] as const}
+            tabs={[...gameGroups, "network", "rcon"]}
             value={configTab}
             onChange={setConfigTab}
-            labels={{ game: "Game settings", network: "Network & resources", rcon: "RCON" }}
+            labels={{ network: "Network & resources", rcon: "RCON" }}
           />
 
-          {configTab === "game" && (
+          {gameGroups.includes(configTab) && (
             <Card className="space-y-4">
               <TemplateForm
                 template={data.template}
                 value={config}
                 onChange={setConfig}
                 mode="all"
+                activeGroup={configTab}
+                onActiveGroupChange={setConfigTab}
               />
-              <Button onClick={saveConfig}>Save & recreate container</Button>
             </Card>
           )}
 
@@ -1053,31 +1132,6 @@ export default function ServerDetailPage() {
             Backups include only saves and configs from the template (not the
             full game install). The server stays online when possible.
           </p>
-          <Button
-            onClick={async () => {
-              setMessage("Creating backup…");
-              const res = await fetch(`/api/servers/${id}/backups`, {
-                method: "POST",
-              });
-              const j = await res.json().catch(() => ({}));
-              if (!res.ok) {
-                setMessage(j.error || "Backup failed");
-                return;
-              }
-              const list = await fetch(`/api/servers/${id}/backups`).then((r) =>
-                r.json(),
-              );
-              setBackups(list.backups || []);
-              const mb = ((j.sizeBytes || 0) / 1024 / 1024).toFixed(2);
-              setMessage(
-                `Backup created (${mb} MB${
-                  j.entries?.length ? ` · ${j.entries.join(", ")}` : ""
-                })`,
-              );
-            }}
-          >
-            Create backup
-          </Button>
           <ul className="space-y-2 text-sm">
             {backups.map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-2">
@@ -1132,6 +1186,59 @@ export default function ServerDetailPage() {
                 </div>
               </li>
             ))}
+            {backups.length === 0 && (
+              <li className="text-muted">No panel backups yet</li>
+            )}
+          </ul>
+        </Card>
+      )}
+
+      {tab === "backups" && containerBackups.length > 0 && (
+        <Card className="mt-4 space-y-3">
+          <div>
+            <h3 className="font-medium">Game auto-backups</h3>
+            <p className="text-sm text-muted">
+              Created by the game server itself (Maintenance settings), not
+              tracked by the panel. Read-only here — delete or download only.
+            </p>
+          </div>
+          <ul className="space-y-2 text-sm">
+            {containerBackups.map((b) => (
+              <li key={b.id} className="flex items-center justify-between gap-2">
+                <span className="min-w-0 truncate">
+                  <span className="font-medium">{b.name}</span>
+                  <span className="text-muted">
+                    {" "}
+                    · {b.isDirectory ? "folder" : `${Math.round((b.sizeBytes ?? 0) / 1024)} KB`} ·{" "}
+                    {new Date(b.createdAt).toLocaleString()}
+                  </span>
+                </span>
+                <div className="flex shrink-0 gap-2">
+                  {!b.isDirectory && (
+                    <a
+                      href={`/api/servers/${id}/backups/${encodeURIComponent(b.id)}/download`}
+                      className="inline-flex items-center rounded-lg border border-border bg-card-elevated px-2.5 py-1.5 text-sm hover:border-accent/40"
+                    >
+                      Download
+                    </a>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      await fetch(`/api/servers/${id}/backups`, {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ backupId: b.id }),
+                      });
+                      setContainerBackups((prev) => prev.filter((x) => x.id !== b.id));
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </li>
+            ))}
           </ul>
         </Card>
       )}
@@ -1139,64 +1246,178 @@ export default function ServerDetailPage() {
       {tab === "schedules" && (
         <Card className="space-y-3">
           <form
-            className="grid gap-2 md:grid-cols-4"
+            className="space-y-3 rounded-lg border border-border p-3"
             onSubmit={async (e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              await fetch(`/api/servers/${id}/schedules`, {
+              const res = await fetch(`/api/servers/${id}/schedules`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  name: fd.get("name"),
-                  cron: fd.get("cron"),
-                  action: fd.get("action"),
+                  name: newScheduleName,
+                  cron: newScheduleCron,
+                  action: newScheduleAction,
+                  commandText: newScheduleCommand,
                 }),
               });
+              const j = await res.json().catch(() => ({}));
+              if (!res.ok) {
+                setMessage(j.error || "Could not add schedule");
+                return;
+              }
               const list = await fetch(`/api/servers/${id}/schedules`).then(
                 (r) => r.json(),
               );
               setScheduleList(list.schedules || []);
-              e.currentTarget.reset();
+              setNewScheduleName("");
+              setNewScheduleCron("0 4 * * *");
+              setNewScheduleAction("backup");
+              setNewScheduleCommand("");
             }}
           >
-            <Input name="name" placeholder="Name" required />
-            <Input name="cron" placeholder="0 4 * * *" required />
-            <select
-              name="action"
-              className="rounded-md border border-border bg-card px-3 py-2 text-sm"
-              defaultValue="backup"
-            >
-              <option value="start">start</option>
-              <option value="stop">stop</option>
-              <option value="restart">restart</option>
-              <option value="backup">backup</option>
-            </select>
-            <Button type="submit">Add</Button>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs">Name</Label>
+                <Input
+                  value={newScheduleName}
+                  onChange={(e) => setNewScheduleName(e.target.value)}
+                  placeholder="Nightly backup"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Action</Label>
+                <select
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+                  value={newScheduleAction}
+                  onChange={(e) => setNewScheduleAction(e.target.value)}
+                >
+                  <option value="start">start</option>
+                  <option value="stop">stop</option>
+                  <option value="restart">restart</option>
+                  <option value="backup">backup</option>
+                  <option value="update-image">update image</option>
+                  <option value="rcon">rcon command</option>
+                </select>
+              </div>
+            </div>
+            {newScheduleAction === "rcon" && (
+              <div>
+                <Label className="text-xs">RCON command</Label>
+                <Input
+                  value={newScheduleCommand}
+                  onChange={(e) => setNewScheduleCommand(e.target.value)}
+                  placeholder="save"
+                  required
+                />
+              </div>
+            )}
+            <div>
+              <Label className="text-xs">Schedule</Label>
+              <CronInput
+                value={newScheduleCron}
+                onChange={setNewScheduleCron}
+                allowDisabled={false}
+                className="max-w-sm"
+              />
+            </div>
+            <Button type="submit">Add schedule</Button>
           </form>
           <ul className="space-y-2 text-sm">
             {scheduleList.map((s) => (
-              <li key={s.id} className="flex justify-between">
-                <span>
-                  {s.name} · <code>{s.cron}</code> · {s.action}
-                </span>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={async () => {
-                    await fetch(`/api/servers/${id}/schedules`, {
-                      method: "DELETE",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ scheduleId: s.id }),
-                    });
-                    setScheduleList((prev) =>
-                      prev.filter((x) => x.id !== s.id),
-                    );
-                  }}
-                >
-                  Remove
-                </Button>
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2 last:border-0"
+              >
+                <div className="min-w-0">
+                  <span>
+                    <label className="mr-2 inline-flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={s.enabled}
+                        onChange={async (e) => {
+                          const enabled = e.target.checked;
+                          setScheduleList((prev) =>
+                            prev.map((x) =>
+                              x.id === s.id ? { ...x, enabled } : x,
+                            ),
+                          );
+                          await fetch(`/api/servers/${id}/schedules`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ scheduleId: s.id, enabled }),
+                          });
+                        }}
+                      />
+                    </label>
+                    {s.name} · <code>{s.cron}</code> · {s.action}
+                    {s.action === "rcon" && s.commandText
+                      ? ` (${s.commandText})`
+                      : ""}
+                  </span>
+                  <p className="text-xs text-muted">
+                    {s.lastRunAt
+                      ? `Last run ${new Date(s.lastRunAt).toLocaleString()} — ${
+                          s.lastRunStatus === "fail"
+                            ? `failed: ${s.lastRunError || "unknown error"}`
+                            : "ok"
+                        }`
+                      : "Never run yet"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={scheduleBusy === s.id}
+                    onClick={async () => {
+                      setScheduleBusy(s.id);
+                      setMessage(`Running "${s.name}"…`);
+                      const res = await fetch(`/api/servers/${id}/schedules`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          action: "run-now",
+                          scheduleId: s.id,
+                        }),
+                      });
+                      const j = await res.json().catch(() => ({}));
+                      setScheduleBusy(null);
+                      if (!res.ok) {
+                        setMessage(j.error || "Run failed");
+                        return;
+                      }
+                      setMessage(`Ran "${s.name}"`);
+                      if (j.schedule) {
+                        setScheduleList((prev) =>
+                          prev.map((x) => (x.id === s.id ? j.schedule : x)),
+                        );
+                      }
+                    }}
+                  >
+                    {scheduleBusy === s.id ? "Running…" : "Run now"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={async () => {
+                      await fetch(`/api/servers/${id}/schedules`, {
+                        method: "DELETE",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ scheduleId: s.id }),
+                      });
+                      setScheduleList((prev) =>
+                        prev.filter((x) => x.id !== s.id),
+                      );
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
               </li>
             ))}
+            {scheduleList.length === 0 && (
+              <li className="text-muted">No schedules yet</li>
+            )}
           </ul>
         </Card>
       )}
@@ -1255,6 +1476,8 @@ export default function ServerDetailPage() {
           will be permanently removed.
         </p>
       </Modal>
+
+      <StickyActionBar>{footerAction}</StickyActionBar>
     </div>
   );
 }

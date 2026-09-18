@@ -105,6 +105,7 @@ export function templateToYaml(tpl: GameTemplate): string {
 }
 
 export function getTemplate(id: string): GameTemplate | null {
+  syncTemplatesToDb();
   const db = getDb();
   const row = db.select().from(templates).where(eq(templates.id, id)).get();
   if (!row) return null;

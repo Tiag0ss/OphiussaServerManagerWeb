@@ -1,10 +1,11 @@
-import { createReadStream, existsSync } from "fs";
+import { createReadStream, existsSync, statSync } from "fs";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { requireSession } from "@/lib/auth/session";
 import { getDb } from "@/lib/db";
 import { backups } from "@/lib/db/schema";
 import { canAccessServer } from "@/lib/permissions";
+import { resolveContainerBackupPath } from "@/lib/backups";
 import { Readable } from "stream";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,23 @@ export async function GET(_req: Request, ctx: Ctx) {
   const { id, backupId } = await ctx.params;
   if (!canAccessServer(user, id, "backup")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (backupId.startsWith("container:")) {
+    const full = resolveContainerBackupPath(id, backupId);
+    if (!full || statSync(full).isDirectory()) {
+      return NextResponse.json(
+        { error: "Not found or not downloadable (folder backup — use the Files tab)" },
+        { status: 404 },
+      );
+    }
+    const filename = backupId.slice("container:".length);
+    const stream = createReadStream(full);
+    return new NextResponse(Readable.toWeb(stream) as ReadableStream, {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
   }
   const row = getDb()
     .select()

@@ -217,6 +217,51 @@ export async function deleteBackup(backupId: string) {
   db.delete(backups).where(eq(backups.id, backupId)).run();
 }
 
+export type ContainerBackupEntry = {
+  id: string;
+  name: string;
+  sizeBytes: number | null;
+  isDirectory: boolean;
+  createdAt: Date;
+};
+
+/**
+ * Some game images (e.g. lloesche/valheim-server) run their own scheduled
+ * backups inside the container, writing into a "backups" folder at the root
+ * of the data volume — entirely separate from this panel's own tracked
+ * backups. Surface them read-only so they're not invisible to the user.
+ */
+export function listContainerBackups(serverId: string): ContainerBackupEntry[] {
+  const dir = path.join(serverDataDir(serverId), "backups");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .map((name) => {
+      const full = path.join(dir, name);
+      const stat = statSync(full);
+      return {
+        id: `container:${name}`,
+        name,
+        sizeBytes: stat.isDirectory() ? null : stat.size,
+        isDirectory: stat.isDirectory(),
+        createdAt: stat.mtime,
+      };
+    })
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+}
+
+/** Resolve a container-backup id (from listContainerBackups) to its file path, guarding path traversal. */
+export function resolveContainerBackupPath(serverId: string, backupId: string) {
+  if (!backupId.startsWith("container:")) return null;
+  const name = backupId.slice("container:".length);
+  if (!name || name.includes("/") || name.includes("\\") || name === "." || name === "..") {
+    return null;
+  }
+  const dir = path.join(serverDataDir(serverId), "backups");
+  const full = path.join(dir, name);
+  if (!existsSync(full)) return null;
+  return full;
+}
+
 export async function backupPanelDb() {
   mkdirSync(PANEL_BACKUPS_DIR, { recursive: true });
   const dest = path.join(

@@ -21,7 +21,7 @@ import {
 } from "@/lib/templates/load";
 import { serverDataDir } from "@/lib/paths";
 import { mkdirSync } from "fs";
-import { dispatchAlert, sendDiscord } from "@/lib/alerts/notify";
+import { notifyServerEvent } from "@/lib/alerts/notify";
 
 export const dynamic = "force-dynamic";
 
@@ -156,20 +156,14 @@ export async function POST(req: Request) {
     details: { name, templateId },
   });
 
-  const installTitle = `Server installed — ${name}`;
-  const installMessage = `${name} (${tpl.name}) was created by ${user.email}.`;
-  dispatchAlert({
-    title: installTitle,
-    message: installMessage,
-    severity: "info",
-  }).catch(() => undefined);
-  if (typeof merged.discordWebhook === "string" && merged.discordWebhook.trim()) {
-    sendDiscord(merged.discordWebhook.trim(), {
-      title: installTitle,
-      message: installMessage,
+  notifyServerEvent(
+    { name, configJson: JSON.stringify(merged) },
+    {
+      title: `Server installed — ${name}`,
+      message: `${name} (${tpl.name}) was created by ${user.email}.`,
       severity: "info",
-    }).catch(() => undefined);
-  }
+    },
+  );
 
   return NextResponse.json({
     id,

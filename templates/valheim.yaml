@@ -132,7 +132,7 @@ fields:
     advanced: true
     bind: { env: TZ }
   - key: updateCron
-    type: string
+    type: cron
     group: Maintenance
     label: Update check cron
     default: "*/15 * * * *"
@@ -147,7 +147,7 @@ fields:
     advanced: true
     bind: { env: UPDATE_IF_IDLE, trueFalse: true }
   - key: restartCron
-    type: string
+    type: cron
     group: Maintenance
     label: Daily restart cron
     default: "10 5 * * *"
@@ -168,7 +168,7 @@ fields:
     default: true
     bind: { env: BACKUPS, trueFalse: true }
   - key: backupsCron
-    type: string
+    type: cron
     group: Maintenance
     label: Backup cron
     default: "5 * * * *"

@@ -138,10 +138,14 @@ export const schedules = sqliteTable("schedules", {
   name: text("name").notNull(),
   cron: text("cron").notNull(),
   action: text("action", {
-    enum: ["start", "stop", "restart", "backup"],
+    enum: ["start", "stop", "restart", "backup", "update-image", "rcon"],
   }).notNull(),
+  /** RCON command text, only used when action = "rcon". */
+  commandText: text("command_text"),
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   lastRunAt: integer("last_run_at", { mode: "timestamp_ms" }),
+  lastRunStatus: text("last_run_status", { enum: ["ok", "fail"] }),
+  lastRunError: text("last_run_error"),
 });
 
 export const metricSamples = sqliteTable("metric_samples", {

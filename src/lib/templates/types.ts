@@ -7,6 +7,7 @@ export type FieldType =
   | "select"
   | "list"
   | "port"
+  | "cron"
   | "group";
 
 export type FieldOption = { value: string; label: string };

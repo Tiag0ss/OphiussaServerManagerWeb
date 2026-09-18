@@ -7,6 +7,8 @@ import { canAccessServer } from "@/lib/permissions";
 import {
   createServerBackup,
   deleteBackup,
+  listContainerBackups,
+  resolveContainerBackupPath,
   restoreServerBackup,
 } from "@/lib/backups";
 
@@ -26,7 +28,8 @@ export async function GET(_req: Request, ctx: Ctx) {
     .where(eq(backups.serverId, id))
     .all()
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  return NextResponse.json({ backups: rows });
+  const containerBackups = listContainerBackups(id);
+  return NextResponse.json({ backups: rows, containerBackups });
 }
 
 export async function POST(req: Request, ctx: Ctx) {
@@ -58,6 +61,13 @@ export async function DELETE(req: Request, ctx: Ctx) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const { backupId } = await req.json();
+  if (typeof backupId === "string" && backupId.startsWith("container:")) {
+    const full = resolveContainerBackupPath(id, backupId);
+    if (!full) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const { rmSync } = await import("fs");
+    rmSync(full, { recursive: true, force: true });
+    return NextResponse.json({ ok: true });
+  }
   await deleteBackup(backupId);
   return NextResponse.json({ ok: true });
 }

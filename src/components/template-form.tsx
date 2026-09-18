@@ -7,6 +7,7 @@ import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { SecretInput } from "@/components/ui/secret-input";
 import { TabBar } from "@/components/ui/tab-bar";
+import { CronInput } from "@/components/ui/cron-input";
 
 type Props = {
   template: GameTemplate;
@@ -16,9 +17,34 @@ type Props = {
   ports?: Record<string, number>;
   portRange?: { start: number; end: number };
   onPortChange?: (key: string, value: number) => void;
+  /**
+   * Control the active field group from outside (e.g. to merge this form's
+   * groups into a single tab row alongside sibling panels) instead of
+   * rendering an internal tab bar.
+   */
+  activeGroup?: string;
+  onActiveGroupChange?: (group: string) => void;
 };
 
 const PORTS_GROUP = "Ports";
+
+/** Field groups a template would render in this mode, in display order. */
+export function computeFieldGroups(
+  template: GameTemplate,
+  mode: "simple" | "advanced" | "all" = "all",
+): [string, TemplateField[]][] {
+  const map = new Map<string, TemplateField[]>();
+  for (const field of template.fields) {
+    if (field.type === "group") continue;
+    const isAdvanced = Boolean(field.advanced);
+    if (mode === "simple" && isAdvanced) continue;
+    if (mode === "advanced" && !isAdvanced) continue;
+    const g = field.group || "General";
+    if (!map.has(g)) map.set(g, []);
+    map.get(g)!.push(field);
+  }
+  return [...map.entries()];
+}
 
 export function TemplateForm({
   template,
@@ -28,22 +54,16 @@ export function TemplateForm({
   ports,
   portRange,
   onPortChange,
+  activeGroup: controlledActiveGroup,
+  onActiveGroupChange,
 }: Props) {
   const showPorts = Boolean(ports && portRange && onPortChange);
+  const controlled = controlledActiveGroup !== undefined;
 
-  const fieldGroups = useMemo(() => {
-    const map = new Map<string, TemplateField[]>();
-    for (const field of template.fields) {
-      if (field.type === "group") continue;
-      const isAdvanced = Boolean(field.advanced);
-      if (mode === "simple" && isAdvanced) continue;
-      if (mode === "advanced" && !isAdvanced) continue;
-      const g = field.group || "General";
-      if (!map.has(g)) map.set(g, []);
-      map.get(g)!.push(field);
-    }
-    return [...map.entries()];
-  }, [template, mode]);
+  const fieldGroups = useMemo(
+    () => computeFieldGroups(template, mode),
+    [template, mode],
+  );
 
   const groups = useMemo(() => {
     if (!showPorts) return fieldGroups;
@@ -57,14 +77,20 @@ export function TemplateForm({
     ];
   }, [showPorts, fieldGroups]);
 
-  const [activeGroup, setActiveGroup] = useState(groups[0]?.[0] || "General");
+  const [internalActiveGroup, setInternalActiveGroup] = useState(
+    groups[0]?.[0] || "General",
+  );
 
   useEffect(() => {
+    if (controlled) return;
     const first = groups[0]?.[0] || "General";
-    setActiveGroup((cur) =>
+    setInternalActiveGroup((cur) =>
       groups.some(([g]) => g === cur) ? cur : first,
     );
-  }, [groups]);
+  }, [groups, controlled]);
+
+  const activeGroup = controlled ? controlledActiveGroup! : internalActiveGroup;
+  const setActiveGroup = onActiveGroupChange ?? setInternalActiveGroup;
 
   function setField(key: string, v: unknown) {
     onChange({ ...value, [key]: v });
@@ -74,7 +100,7 @@ export function TemplateForm({
 
   return (
     <div className="space-y-4">
-      {groups.length > 1 && (
+      {!controlled && groups.length > 1 && (
         <TabBar
           tabs={groups.map(([g]) => g)}
           value={activeGroup}
@@ -172,6 +198,21 @@ function FieldControl({
             </option>
           ))}
         </Select>
+      </div>
+    );
+  }
+
+  if (field.type === "cron") {
+    return (
+      <div>
+        <Label>{field.label || field.key}</Label>
+        <CronInput
+          value={String(value ?? field.default ?? "")}
+          onChange={onChange}
+        />
+        {field.description && (
+          <p className="mt-1 text-xs text-muted">{field.description}</p>
+        )}
       </div>
     );
   }

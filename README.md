@@ -204,13 +204,38 @@ The Docker socket must be available to spawn game containers. FTP uses port **21
 ## Features
 
 - **Dashboard** — host & server metrics, history, sparklines, health checks
-- **Templates** — Steam dedicated (generic App ID), Valheim, V Rising, Palworld, ARK, Minecraft, Satisfactory, Conan Exiles, and more
+- **Templates** — 16 game server templates; see [Templates](#templates) below for which are verified working end-to-end
 - **Lifecycle** — start/stop/restart, RCON save, pull image, clone, import/export
 - **Monitoring** — Discord, webhook, email alerts; CPU/RAM/disk thresholds
 - **Access** — users, quotas, per-server permissions, audit log
 - **Files** — explorer-style browser (upload, download, copy/cut/paste), plus FTP + SFTP per server
 - **Mods** — Thunderstore, CurseForge, Steam Workshop
 - **Backups** — local backups with retention and cron schedules
+
+## Templates
+
+Every template ships with a `tested: true/false` flag, shown as a "Tested" / "Untested" badge in the panel (server creation screen and the admin Templates editor). "Untested" doesn't mean broken — it means it hasn't been verified end-to-end (mods, RCON, backups, etc.) yet.
+
+| Template | Status |
+|---|---|
+| Valheim | ✅ Tested |
+| ARK: Survival Ascended | ⬜ Untested |
+| ARK: Survival Evolved | ⬜ Untested |
+| Conan Exiles | ⬜ Untested |
+| Core Keeper | ⬜ Untested |
+| RuneScape: Dragonwilds | ⬜ Untested |
+| Enshrouded | ⬜ Untested |
+| Factorio | ⬜ Untested |
+| Minecraft Java | ⬜ Untested |
+| Nightingale | ⬜ Untested |
+| Palworld | ⬜ Untested |
+| Project Zomboid | ⬜ Untested |
+| Satisfactory | ⬜ Untested |
+| Smalland | ⬜ Untested |
+| Steam Dedicated (generic App ID) | ⬜ Untested |
+| V Rising | ⬜ Untested |
+
+To mark a template as tested once you've verified it, add `tested: true` near the top of its YAML file in `templates/`.
 
 ## License
 

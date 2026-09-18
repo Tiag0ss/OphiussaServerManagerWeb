@@ -311,7 +311,7 @@ fields:
     default: true
     bind: { env: BACKUP_ENABLED, trueFalse: true }
   - key: backupCron
-    type: string
+    type: cron
     group: Maintenance
     label: Backup cron
     default: "0 */2 * * *"

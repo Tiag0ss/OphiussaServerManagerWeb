@@ -98,9 +98,9 @@ export function AppShell({
   const activeLabel = resolveActiveLabel(pathname, servers);
 
   return (
-    <div className="flex min-h-dvh w-full">
+    <div className="flex h-dvh w-full overflow-hidden">
       <aside className="hidden w-[264px] shrink-0 border-r border-border/80 bg-sidebar md:flex md:flex-col">
-        <div className="flex h-dvh flex-col px-4 py-5">
+        <div className="flex h-full flex-col px-4 py-5">
           <SidebarBrand />
           <div className="mt-7 min-h-0 flex-1">
             <SidebarNav
@@ -117,7 +117,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border/80 bg-sidebar/90 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-sidebar/75 md:hidden">
           <button
             type="button"
@@ -186,7 +186,7 @@ export function AppShell({
           </div>
         )}
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
           {children}
         </main>
       </div>
