@@ -304,13 +304,18 @@ export default function ServerDetailPage() {
     const res = await fetch(`/api/servers/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ config, recreate: true }),
+      body: JSON.stringify({ config }),
     });
     if (!res.ok) {
       const j = await res.json();
       setMessage(j.error || "Save failed");
     } else {
-      setMessage("Saved and container recreated");
+      const j = await res.json().catch(() => ({}));
+      setMessage(
+        j.recreated
+          ? "Saved and container recreated"
+          : "Saved — no changes affecting the container",
+      );
       load();
     }
   }

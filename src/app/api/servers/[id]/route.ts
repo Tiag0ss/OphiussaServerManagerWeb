@@ -23,6 +23,7 @@ import { getSettings } from "@/lib/settings";
 import { generatePassword, hashPassword } from "@/lib/auth/password";
 import { decryptSecret, encryptSecret } from "@/lib/secrets";
 import { ftpPort, sftpPort } from "@/lib/ports";
+import { deepEqual } from "@/lib/deep-equal";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
   const patch: Partial<typeof servers.$inferInsert> = { updatedAt: new Date() };
   if (body.name) patch.name = body.name;
-  if (body.config) patch.configJson = JSON.stringify(body.config);
+  let configChanged = false;
+  if (body.config) {
+    configChanged = !deepEqual(body.config, JSON.parse(server.configJson));
+    patch.configJson = JSON.stringify(body.config);
+  }
   if (typeof body.memoryMb === "number") patch.memoryMb = nextMemory;
   if (typeof body.cpuLimit === "number") patch.cpuLimit = nextCpu;
   if (typeof body.ftpEnabled === "boolean") patch.ftpEnabled = body.ftpEnabled;
@@ -197,7 +202,11 @@ export async function PATCH(req: Request, ctx: Ctx) {
   }
 
   const shouldRecreate =
-    Boolean(body.recreate) || resourcesChanged || portsChanged || rconChanged;
+    Boolean(body.recreate) ||
+    resourcesChanged ||
+    portsChanged ||
+    rconChanged ||
+    configChanged;
 
   db.update(servers).set(patch).where(eq(servers.id, id)).run();
 
