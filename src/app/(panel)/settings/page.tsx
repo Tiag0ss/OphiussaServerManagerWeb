@@ -1,9 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
 import { TabBar } from "@/components/ui/tab-bar";
+import {
+  StickyActionBar,
+  STICKY_ACTION_BAR_CLEARANCE,
+} from "@/components/ui/sticky-action-bar";
+import { cn } from "@/lib/utils";
 
 type FieldDef = {
   key: string;
@@ -59,8 +64,7 @@ export default function SettingsPage() {
       .then((d) => setForm(d));
   }, []);
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function saveSettings() {
     const res = await fetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -102,20 +106,23 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-none space-y-6 xl:max-w-3xl">
-      <div>
-        <h2 className="text-2xl font-semibold">Settings</h2>
-        <p className="text-sm text-muted">Panel-wide configuration</p>
+    <div className={cn("mx-auto w-full max-w-none space-y-6 xl:max-w-3xl", STICKY_ACTION_BAR_CLEARANCE)}>
+      <div className="sticky top-0 z-30 -mx-4 space-y-4 border-b border-border bg-background/95 px-4 pb-0 pt-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div>
+          <h2 className="text-2xl font-semibold">Settings</h2>
+          <p className="text-sm text-muted">Panel-wide configuration</p>
+        </div>
+
+        <TabBar
+          tabs={TABS.map((t) => t.id)}
+          value={tab}
+          onChange={setTab}
+          labels={Object.fromEntries(TABS.map((t) => [t.id, t.label])) as Record<TabId, string>}
+          className="border-b-0"
+        />
       </div>
 
-      <TabBar
-        tabs={TABS.map((t) => t.id)}
-        value={tab}
-        onChange={setTab}
-        labels={Object.fromEntries(TABS.map((t) => [t.id, t.label])) as Record<TabId, string>}
-      />
-
-      <form className="space-y-4" onSubmit={onSubmit}>
+      <form id="settings-form" className="space-y-4" onSubmit={(e) => { e.preventDefault(); saveSettings(); }}>
         <Card className="space-y-4">
           <div>
             <h3 className="font-medium">{tabIntro[tab].title}</h3>
@@ -332,8 +339,13 @@ export default function SettingsPage() {
         </Card>
 
         {message && <p className="text-sm text-muted">{message}</p>}
-        <Button type="submit">Save settings</Button>
       </form>
+
+      <StickyActionBar>
+        <Button type="submit" form="settings-form" size="sm">
+          Save settings
+        </Button>
+      </StickyActionBar>
     </div>
   );
 }

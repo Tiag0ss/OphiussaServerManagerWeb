@@ -7,6 +7,7 @@ import { Input, Label, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { SecretInput } from "@/components/ui/secret-input";
 import { TabBar } from "@/components/ui/tab-bar";
+import { CronInput } from "@/components/ui/cron-input";
 
 type Props = {
   template: GameTemplate;
@@ -197,6 +198,21 @@ function FieldControl({
             </option>
           ))}
         </Select>
+      </div>
+    );
+  }
+
+  if (field.type === "cron") {
+    return (
+      <div>
+        <Label>{field.label || field.key}</Label>
+        <CronInput
+          value={String(value ?? field.default ?? "")}
+          onChange={onChange}
+        />
+        {field.description && (
+          <p className="mt-1 text-xs text-muted">{field.description}</p>
+        )}
       </div>
     );
   }

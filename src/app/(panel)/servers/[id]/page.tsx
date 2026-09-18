@@ -20,6 +20,12 @@ import { ServerPermissionsPanel } from "@/components/servers/server-permissions-
 import { ServerTransferPanel } from "@/components/servers/server-transfer-panel";
 import { TabBar } from "@/components/ui/tab-bar";
 import { Modal } from "@/components/ui/modal";
+import { CronInput } from "@/components/ui/cron-input";
+import {
+  StickyActionBar,
+  STICKY_ACTION_BAR_CLEARANCE,
+} from "@/components/ui/sticky-action-bar";
+import { cn } from "@/lib/utils";
 
 type QuotaHeadroom = {
   maxServers: number;
@@ -144,7 +150,10 @@ export default function ServerDetailPage() {
     }>
   >([]);
   const [scheduleBusy, setScheduleBusy] = useState<string | null>(null);
+  const [newScheduleName, setNewScheduleName] = useState("");
+  const [newScheduleCron, setNewScheduleCron] = useState("0 4 * * *");
   const [newScheduleAction, setNewScheduleAction] = useState("backup");
+  const [newScheduleCommand, setNewScheduleCommand] = useState("");
   const [confirmName, setConfirmName] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -273,6 +282,24 @@ export default function ServerDetailPage() {
     }
   }
 
+  async function createBackup() {
+    setMessage("Creating backup…");
+    const res = await fetch(`/api/servers/${id}/backups`, {
+      method: "POST",
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMessage(j.error || "Backup failed");
+      return;
+    }
+    const list = await fetch(`/api/servers/${id}/backups`).then((r) => r.json());
+    setBackups(list.backups || []);
+    const mb = ((j.sizeBytes || 0) / 1024 / 1024).toFixed(2);
+    setMessage(
+      `Backup created (${mb} MB${j.entries?.length ? ` · ${j.entries.join(", ")}` : ""})`,
+    );
+  }
+
   async function saveConfig() {
     const res = await fetch(`/api/servers/${id}`, {
       method: "PATCH",
@@ -371,60 +398,75 @@ export default function ServerDetailPage() {
     "danger",
   ] as const;
 
+  const footerAction =
+    tab === "config" && gameGroups.includes(configTab) ? (
+      <Button size="sm" onClick={saveConfig}>
+        Save & recreate container
+      </Button>
+    ) : tab === "backups" ? (
+      <Button size="sm" onClick={createBackup}>
+        Create backup
+      </Button>
+    ) : null;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted">
-            <Link href="/dashboard" className="hover:underline">
-              Dashboard
-            </Link>{" "}
-            / {data.server.name}
-          </p>
-          <h2 className="text-2xl font-semibold">{data.server.name}</h2>
-          <div className="mt-2">
-            <ServerHealthBadge serverId={id} />
+    <div className={cn("space-y-6", footerAction && STICKY_ACTION_BAR_CLEARANCE)}>
+      <div className="sticky top-0 z-30 -mx-4 space-y-4 border-b border-border bg-background/95 px-4 pb-0 pt-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted">
+              <Link href="/dashboard" className="hover:underline">
+                Dashboard
+              </Link>{" "}
+              / {data.server.name}
+            </p>
+            <h2 className="text-2xl font-semibold">{data.server.name}</h2>
+            <div className="mt-2">
+              <ServerHealthBadge serverId={id} />
+            </div>
+            <p className="mt-2 text-sm text-muted">
+              {data.template.name}
+              {data.ownerName ? ` · owner ${data.ownerName}` : ""} ·{" "}
+              {data.server.status}
+              {data.stats
+                ? ` · CPU ${data.stats.cpuPercent}% · RAM ${data.stats.memoryMb} MB`
+                : ""}
+            </p>
+            {data.containerName && (
+              <p className="font-mono text-xs text-muted">
+                docker: {data.containerName}
+                {data.dockerNetwork ? ` · net ${data.dockerNetwork}` : ""}
+              </p>
+            )}
+            {data.dockerSocket && (
+              <p className="text-xs text-muted" title={data.dockerSocket}>
+                Engine socket: {data.dockerSocket.replace(/^\/home\/[^/]+/, "~")}
+                {data.dockerSocket.includes("desktop")
+                  ? " (Docker Desktop)"
+                  : " (system Engine — use: docker context use default)"}
+              </p>
+            )}
           </div>
-          <p className="mt-2 text-sm text-muted">
-            {data.template.name}
-            {data.ownerName ? ` · owner ${data.ownerName}` : ""} ·{" "}
-            {data.server.status}
-            {data.stats
-              ? ` · CPU ${data.stats.cpuPercent}% · RAM ${data.stats.memoryMb} MB`
-              : ""}
-          </p>
-          {data.containerName && (
-            <p className="font-mono text-xs text-muted">
-              docker: {data.containerName}
-              {data.dockerNetwork ? ` · net ${data.dockerNetwork}` : ""}
-            </p>
-          )}
-          {data.dockerSocket && (
-            <p className="text-xs text-muted" title={data.dockerSocket}>
-              Engine socket: {data.dockerSocket.replace(/^\/home\/[^/]+/, "~")}
-              {data.dockerSocket.includes("desktop")
-                ? " (Docker Desktop)"
-                : " (system Engine — use: docker context use default)"}
-            </p>
-          )}
+          <div className="flex flex-wrap gap-2">
+            <CopyJoinButton
+              address={joinAddress(data.publicIp, data.ports)}
+            />
+            <Button size="sm" onClick={() => action("start")}>
+              Start
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => action("stop")}>
+              Stop
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => action("restart")}>
+              Restart
+            </Button>
+            <Button size="sm" variant="danger" onClick={() => action("kill")}>
+              Kill
+            </Button>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <CopyJoinButton
-            address={joinAddress(data.publicIp, data.ports)}
-          />
-          <Button size="sm" onClick={() => action("start")}>
-            Start
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => action("stop")}>
-            Stop
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => action("restart")}>
-            Restart
-          </Button>
-          <Button size="sm" variant="danger" onClick={() => action("kill")}>
-            Kill
-          </Button>
-        </div>
+
+        <TabBar tabs={tabs} value={tab} onChange={setTab} className="border-b-0" />
       </div>
 
       {message && (
@@ -432,8 +474,6 @@ export default function ServerDetailPage() {
           {message}
         </p>
       )}
-
-      <TabBar tabs={tabs} value={tab} onChange={setTab} />
 
       {tab === "overview" && (
         <div className="space-y-4">
@@ -465,7 +505,6 @@ export default function ServerDetailPage() {
                 activeGroup={configTab}
                 onActiveGroupChange={setConfigTab}
               />
-              <Button onClick={saveConfig}>Save & recreate container</Button>
             </Card>
           )}
 
@@ -1088,31 +1127,6 @@ export default function ServerDetailPage() {
             Backups include only saves and configs from the template (not the
             full game install). The server stays online when possible.
           </p>
-          <Button
-            onClick={async () => {
-              setMessage("Creating backup…");
-              const res = await fetch(`/api/servers/${id}/backups`, {
-                method: "POST",
-              });
-              const j = await res.json().catch(() => ({}));
-              if (!res.ok) {
-                setMessage(j.error || "Backup failed");
-                return;
-              }
-              const list = await fetch(`/api/servers/${id}/backups`).then((r) =>
-                r.json(),
-              );
-              setBackups(list.backups || []);
-              const mb = ((j.sizeBytes || 0) / 1024 / 1024).toFixed(2);
-              setMessage(
-                `Backup created (${mb} MB${
-                  j.entries?.length ? ` · ${j.entries.join(", ")}` : ""
-                })`,
-              );
-            }}
-          >
-            Create backup
-          </Button>
           <ul className="space-y-2 text-sm">
             {backups.map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-2">
@@ -1227,18 +1241,17 @@ export default function ServerDetailPage() {
       {tab === "schedules" && (
         <Card className="space-y-3">
           <form
-            className="grid gap-2 md:grid-cols-5"
+            className="space-y-3 rounded-lg border border-border p-3"
             onSubmit={async (e) => {
               e.preventDefault();
-              const fd = new FormData(e.currentTarget);
               const res = await fetch(`/api/servers/${id}/schedules`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  name: fd.get("name"),
-                  cron: fd.get("cron"),
-                  action: fd.get("action"),
-                  commandText: fd.get("commandText"),
+                  name: newScheduleName,
+                  cron: newScheduleCron,
+                  action: newScheduleAction,
+                  commandText: newScheduleCommand,
                 }),
               });
               const j = await res.json().catch(() => ({}));
@@ -1250,36 +1263,59 @@ export default function ServerDetailPage() {
                 (r) => r.json(),
               );
               setScheduleList(list.schedules || []);
-              e.currentTarget.reset();
+              setNewScheduleName("");
+              setNewScheduleCron("0 4 * * *");
               setNewScheduleAction("backup");
+              setNewScheduleCommand("");
             }}
           >
-            <Input name="name" placeholder="Name" required />
-            <Input name="cron" placeholder="0 4 * * *" required />
-            <select
-              name="action"
-              className="rounded-md border border-border bg-card px-3 py-2 text-sm"
-              value={newScheduleAction}
-              onChange={(e) => setNewScheduleAction(e.target.value)}
-            >
-              <option value="start">start</option>
-              <option value="stop">stop</option>
-              <option value="restart">restart</option>
-              <option value="backup">backup</option>
-              <option value="update-image">update image</option>
-              <option value="rcon">rcon command</option>
-            </select>
-            {newScheduleAction === "rcon" ? (
-              <Input
-                name="commandText"
-                placeholder="RCON command"
-                required
-                className="md:col-span-1"
-              />
-            ) : (
-              <input type="hidden" name="commandText" value="" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="text-xs">Name</Label>
+                <Input
+                  value={newScheduleName}
+                  onChange={(e) => setNewScheduleName(e.target.value)}
+                  placeholder="Nightly backup"
+                  required
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Action</Label>
+                <select
+                  className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm"
+                  value={newScheduleAction}
+                  onChange={(e) => setNewScheduleAction(e.target.value)}
+                >
+                  <option value="start">start</option>
+                  <option value="stop">stop</option>
+                  <option value="restart">restart</option>
+                  <option value="backup">backup</option>
+                  <option value="update-image">update image</option>
+                  <option value="rcon">rcon command</option>
+                </select>
+              </div>
+            </div>
+            {newScheduleAction === "rcon" && (
+              <div>
+                <Label className="text-xs">RCON command</Label>
+                <Input
+                  value={newScheduleCommand}
+                  onChange={(e) => setNewScheduleCommand(e.target.value)}
+                  placeholder="save"
+                  required
+                />
+              </div>
             )}
-            <Button type="submit">Add</Button>
+            <div>
+              <Label className="text-xs">Schedule</Label>
+              <CronInput
+                value={newScheduleCron}
+                onChange={setNewScheduleCron}
+                allowDisabled={false}
+                className="max-w-sm"
+              />
+            </div>
+            <Button type="submit">Add schedule</Button>
           </form>
           <ul className="space-y-2 text-sm">
             {scheduleList.map((s) => (
@@ -1435,6 +1471,8 @@ export default function ServerDetailPage() {
           will be permanently removed.
         </p>
       </Modal>
+
+      <StickyActionBar>{footerAction}</StickyActionBar>
     </div>
   );
 }
