@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { FilesBrowser } from "@/components/files-browser";
-import { TemplateForm } from "@/components/template-form";
+import { TemplateForm, computeFieldGroups } from "@/components/template-form";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label } from "@/components/ui/field";
 import { CopyJoinButton } from "@/components/copy-join-button";
@@ -139,9 +139,7 @@ export default function ServerDetailPage() {
   const [message, setMessage] = useState("");
   const [ftpPassword, setFtpPassword] = useState<string | null>(null);
   const [ftpResetBusy, setFtpResetBusy] = useState(false);
-  const [configTab, setConfigTab] = useState<"game" | "network" | "rcon">(
-    "game",
-  );
+  const [configTab, setConfigTab] = useState<string>("");
   const [rconEnabled, setRconEnabled] = useState(false);
   const [rconPort, setRconPort] = useState(25575);
   const [rconPassword, setRconPassword] = useState("");
@@ -176,6 +174,13 @@ export default function ServerDetailPage() {
     const t = setInterval(() => load({ syncDrafts: false }), 8000);
     return () => clearInterval(t);
   }, [load]);
+
+  useEffect(() => {
+    if (!data) return;
+    const groups = computeFieldGroups(data.template, "all").map(([g]) => g);
+    const valid = [...groups, "network", "rcon"];
+    setConfigTab((cur) => (valid.includes(cur) ? cur : groups[0] || "network"));
+  }, [data]);
 
   useEffect(() => {
     if (tab !== "console") return;
@@ -334,6 +339,10 @@ export default function ServerDetailPage() {
     router.refresh();
   }
 
+  const gameGroups = data
+    ? computeFieldGroups(data.template, "all").map(([g]) => g)
+    : [];
+
   if (!data) {
     return <p className="text-sm text-muted">Loading…</p>;
   }
@@ -428,19 +437,21 @@ export default function ServerDetailPage() {
       {tab === "config" && (
         <div className="space-y-4">
           <TabBar
-            tabs={["game", "network", "rcon"] as const}
+            tabs={[...gameGroups, "network", "rcon"]}
             value={configTab}
             onChange={setConfigTab}
-            labels={{ game: "Game settings", network: "Network & resources", rcon: "RCON" }}
+            labels={{ network: "Network & resources", rcon: "RCON" }}
           />
 
-          {configTab === "game" && (
+          {gameGroups.includes(configTab) && (
             <Card className="space-y-4">
               <TemplateForm
                 template={data.template}
                 value={config}
                 onChange={setConfig}
                 mode="all"
+                activeGroup={configTab}
+                onActiveGroupChange={setConfigTab}
               />
               <Button onClick={saveConfig}>Save & recreate container</Button>
             </Card>
