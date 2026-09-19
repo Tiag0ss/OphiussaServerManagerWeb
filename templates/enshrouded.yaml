@@ -30,13 +30,6 @@ fields:
     required: true
     default: Enshrouded Server
     bind: { env: SERVER_NAME }
-  - key: serverPassword
-    type: string
-    group: Server
-    label: Password
-    secret: true
-    default: changeme
-    bind: { env: SERVER_PASSWORD }
   - key: slots
     type: number
     group: Server
@@ -51,4 +44,134 @@ fields:
     label: Query port (container)
     default: 15637
     advanced: true
-    bind: { env: QUERY_PORT }
+    bind: { env: SERVER_QUERYPORT }
+  - key: enableVoiceChat
+    type: boolean
+    group: Server
+    label: Enable voice chat
+    default: false
+    advanced: true
+    bind: { env: SERVER_ENABLE_VOICE_CHAT, trueFalse: true }
+  - key: enableTextChat
+    type: boolean
+    group: Server
+    label: Enable text chat
+    default: false
+    advanced: true
+    bind: { env: SERVER_ENABLE_TEXT_CHAT, trueFalse: true }
+  - key: serverRoleName
+    type: string
+    group: Access
+    label: Role name
+    default: Default
+    description: Join password is now per-role (the old flat server password is ignored by Enshrouded)
+    bind: { env: SERVER_ROLE_0_NAME }
+  - key: serverRolePassword
+    type: string
+    group: Access
+    label: Role password
+    secret: true
+    default: ""
+    bind: { env: SERVER_ROLE_0_PASSWORD }
+  - key: difficultyPreset
+    type: select
+    group: World
+    label: Difficulty preset
+    default: Default
+    options:
+      - { value: Default, label: Default }
+      - { value: Relaxed, label: Relaxed }
+      - { value: Hard, label: Hard }
+      - { value: Survival, label: Survival }
+      - { value: Custom, label: Custom (enables the fields below) }
+    bind: { env: SERVER_GS_PRESET }
+  - key: enableDurability
+    type: boolean
+    group: World
+    label: Enable item durability
+    default: true
+    advanced: true
+    showIf: { field: difficultyPreset, equals: Custom }
+    bind: { env: SERVER_GS_ENABLE_DURABILITY, trueFalse: true }
+  - key: enableStarvingDebuff
+    type: boolean
+    group: World
+    label: Enable starving debuff
+    default: false
+    advanced: true
+    showIf: { field: difficultyPreset, equals: Custom }
+    bind: { env: SERVER_GS_ENABLE_STARVING_DEBUFF, trueFalse: true }
+  - key: pacifyAllEnemies
+    type: boolean
+    group: World
+    label: Pacify all enemies (no attacks until attacked)
+    default: false
+    advanced: true
+    showIf: { field: difficultyPreset, equals: Custom }
+    bind: { env: SERVER_GS_PACIFY_ALL_ENEMIES, trueFalse: true }
+  - key: randomSpawnerAmount
+    type: select
+    group: World
+    label: Enemy spawn amount
+    default: Normal
+    advanced: true
+    showIf: { field: difficultyPreset, equals: Custom }
+    options:
+      - { value: Few, label: Few }
+      - { value: Normal, label: Normal }
+      - { value: Many, label: Many }
+      - { value: Extreme, label: Extreme }
+    bind: { env: SERVER_GS_RANDOM_SPAWNER_AMOUNT }
+  - key: tombstoneMode
+    type: select
+    group: World
+    label: Tombstone mode
+    default: AddBackpackMaterials
+    advanced: true
+    showIf: { field: difficultyPreset, equals: Custom }
+    options:
+      - { value: AddBackpackMaterials, label: Drop backpack materials }
+      - { value: Everything, label: Drop everything }
+      - { value: NoTombstone, label: No tombstone (keep items) }
+    bind: { env: SERVER_GS_TOMBSTONE_MODE }
+  - key: dayTimeDuration
+    type: number
+    group: World
+    label: Day duration (nanoseconds)
+    description: "Image expects raw nanoseconds. 1 minute = 60000000000ns. Default = 30 minutes."
+    default: 1800000000000
+    advanced: true
+    showIf: { field: difficultyPreset, equals: Custom }
+    bind: { env: SERVER_GS_DAY_TIME_DURATION }
+  - key: nightTimeDuration
+    type: number
+    group: World
+    label: Night duration (nanoseconds)
+    description: "Image expects raw nanoseconds. 1 minute = 60000000000ns. Default = 12 minutes."
+    default: 720000000000
+    advanced: true
+    showIf: { field: difficultyPreset, equals: Custom }
+    bind: { env: SERVER_GS_NIGHT_TIME_DURATION }
+  - key: backupCron
+    type: cron
+    group: Maintenance
+    label: Backup cron
+    default: ""
+    description: Empty disables scheduled backups. Avoid intervals under 10 minutes.
+    advanced: true
+    bind: { env: BACKUP_CRON }
+  - key: backupMaxCount
+    type: number
+    group: Maintenance
+    label: Max backups to keep (0 = unlimited)
+    default: 0
+    min: 0
+    advanced: true
+    bind: { env: BACKUP_MAX_COUNT }
+  - key: restartCron
+    type: cron
+    group: Maintenance
+    label: Restart cron (experimental — upstream marks this WIP)
+    default: ""
+    advanced: true
+    bind: { env: RESTART_CRON }

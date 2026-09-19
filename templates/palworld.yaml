@@ -93,6 +93,7 @@ fields:
     type: boolean
     group: Server
     label: Enable RCON
+    description: "Kept on by default (image default is off) — the panel needs RCON for graceful save/stop and health checks"
     default: true
     bind: { env: RCON_ENABLED, trueFalse: true }
   - key: difficulty
@@ -126,6 +127,33 @@ fields:
     advanced: true
     showIf: { field: randomizerType, notEquals: None }
     bind: { env: IS_RANDOMIZER_PAL_LEVEL_RANDOM, trueFalse: true }
+  - key: supplyDropSpan
+    type: number
+    group: World
+    label: Supply drop interval (minutes)
+    min: 1
+    max: 1440
+    default: 180
+    advanced: true
+    bind: { env: SUPPLY_DROP_SPAN }
+  - key: dropItemMaxNum
+    type: number
+    group: World
+    label: Max dropped items in world
+    min: 100
+    max: 10000
+    default: 3000
+    advanced: true
+    bind: { env: DROP_ITEM_MAX_NUM }
+  - key: baseCampMaxNum
+    type: number
+    group: World
+    label: Max base camps
+    min: 1
+    max: 256
+    default: 128
+    advanced: true
+    bind: { env: BASE_CAMP_MAX_NUM }
   - key: deathPenalty
     type: select
     group: Rules
@@ -159,6 +187,19 @@ fields:
     label: Base raids / invaders
     default: true
     bind: { env: ENABLE_INVADER_ENEMY, trueFalse: true }
+  - key: hardcore
+    type: boolean
+    group: Rules
+    label: Hardcore (permadeath)
+    default: false
+    bind: { env: HARDCORE, trueFalse: true }
+  - key: palLost
+    type: boolean
+    group: Rules
+    label: Lose Pals on death
+    default: false
+    advanced: true
+    bind: { env: PAL_LOST, trueFalse: true }
   - key: expRate
     type: slider
     group: Rates
@@ -286,6 +327,75 @@ fields:
     default: 1
     advanced: true
     bind: { env: PLAYER_STAMINA_DECREASE_RATE }
+  - key: palStomach
+    type: slider
+    group: Survival
+    label: Pal hunger drain
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PAL_STOMACH_DECREASE_RATE }
+  - key: palStamina
+    type: slider
+    group: Survival
+    label: Pal stamina drain
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: PAL_STAMINA_DECREASE_RATE }
+  - key: itemWeightRate
+    type: slider
+    group: Survival
+    label: Item weight multiplier
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: ITEM_WEIGHT_RATE }
+  - key: workSpeedRate
+    type: slider
+    group: Rates
+    label: Work speed rate
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    bind: { env: WORK_SPEED_RATE }
+  - key: buildObjectDamageRate
+    type: slider
+    group: Combat
+    label: Building damage taken
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: BUILD_OBJECT_DAMAGE_RATE }
+  - key: buildObjectHpRate
+    type: slider
+    group: Combat
+    label: Building HP
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: BUILD_OBJECT_HP_RATE }
+  - key: buildObjectDeteriorationDamageRate
+    type: slider
+    group: Combat
+    label: Building deterioration rate
+    min: 0
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: BUILD_OBJECT_DETERIORATION_DAMAGE_RATE }
   - key: guildPlayerMax
     type: number
     group: Server
@@ -322,7 +432,7 @@ fields:
     type: boolean
     group: Maintenance
     label: Delete old backups
-    default: true
+    default: false
     advanced: true
     showIf: { field: backupEnabled, equals: true }
     bind: { env: DELETE_OLD_BACKUPS, trueFalse: true }
@@ -332,10 +442,48 @@ fields:
     label: Keep backups (days)
     min: 1
     max: 90
-    default: 7
+    default: 30
     advanced: true
     showIf: { field: deleteOldBackups, equals: true }
     bind: { env: OLD_BACKUP_DAYS }
+  - key: autoSaveSpan
+    type: number
+    group: Maintenance
+    label: Auto-save interval (seconds)
+    min: 10
+    max: 600
+    default: 30
+    advanced: true
+    bind: { env: AUTO_SAVE_SPAN }
+  - key: updateOnBoot
+    type: boolean
+    group: Maintenance
+    label: Auto-update on container start
+    default: true
+    advanced: true
+    bind: { env: UPDATE_ON_BOOT, trueFalse: true }
+  - key: autoPauseEnabled
+    type: boolean
+    group: Maintenance
+    label: Pause server when empty
+    default: false
+    advanced: true
+    bind: { env: AUTO_PAUSE_ENABLED, trueFalse: true }
+  - key: autoRebootEnabled
+    type: boolean
+    group: Maintenance
+    label: Scheduled reboot
+    default: false
+    advanced: true
+    bind: { env: AUTO_REBOOT_ENABLED, trueFalse: true }
+  - key: autoRebootCron
+    type: cron
+    group: Maintenance
+    label: Reboot cron
+    default: "0 0 * * *"
+    advanced: true
+    showIf: { field: autoRebootEnabled, equals: true }
+    bind: { env: AUTO_REBOOT_CRON_EXPRESSION }
   - key: discordWebhook
     type: string
     group: Hooks

@@ -82,3 +82,17 @@ fields:
     default: 30
     advanced: true
     bind: { env: TIMEOUT }
+  - key: keepLogs
+    type: boolean
+    group: Maintenance
+    label: Keep all logs (disable log pruning)
+    default: false
+    advanced: true
+    bind: { env: LOG, trueFalse: true }
+  - key: debug
+    type: boolean
+    group: Maintenance
+    label: Debug mode
+    default: false
+    advanced: true
+    bind: { env: DEBUG, trueFalse: true }

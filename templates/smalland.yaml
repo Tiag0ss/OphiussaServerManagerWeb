@@ -2,7 +2,7 @@ id: smalland
 name: Smalland
 description: Smalland Survive the Wilds dedicated server (Steam app 808040)
 runtime:
-  image: lucasromanomr/smalland-steam-server
+  image: coehl/smalland-server
   stopTimeout: 60
   memoryMb: 4096
   cpuLimit: 2
@@ -12,7 +12,7 @@ runtime:
     - { key: gameTcp, container: 7777, protocol: tcp, matchHost: true }
     - { key: query, container: 7778, protocol: udp, matchHost: true }
   volumes:
-    - { key: data, container: /home/steam/smalland }
+    - { key: data, container: /home/steam/smalland-dedicated }
   env:
     TZ: Europe/Lisbon
     STEAMAPPID: "808040"

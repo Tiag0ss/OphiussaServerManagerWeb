@@ -10,6 +10,7 @@ runtime:
   ports:
     - { key: game, container: 16261, protocol: udp }
     - { key: steam, container: 16262, protocol: udp }
+    - { key: rcon, container: 27015, protocol: tcp }
   volumes:
     - { key: data, container: /home/steam/Zomboid }
   env:
@@ -20,6 +21,11 @@ runtime:
       - Server
       - db
       - Lua
+rcon:
+  enabled: true
+  portKey: rcon
+  passwordField: rconPassword
+  saveCommand: save
 mods:
   providers: [steam-workshop]
   workshopAppId: 108600
@@ -61,3 +67,43 @@ fields:
     min: 1
     max: 100
     bind: { env: MAX_PLAYERS }
+  - key: rconPassword
+    type: string
+    group: Access
+    label: RCON password
+    secret: true
+    required: true
+    default: changeme_rcon
+    bind: { env: RCON_PASSWORD }
+  - key: publicServer
+    type: boolean
+    group: Access
+    label: Allow any player to connect
+    description: "Unchecking restricts joining to pre-approved/allowed players only. Not the same as the in-game server-browser \"Public\" listing option."
+    default: true
+    advanced: true
+    bind: { env: PUBLIC_SERVER, trueFalse: true }
+  - key: pauseOnEmpty
+    type: boolean
+    group: Server
+    label: Pause world when empty
+    default: true
+    advanced: true
+    bind: { env: PAUSE_ON_EMPTY, trueFalse: true }
+  - key: autosaveInterval
+    type: number
+    group: Maintenance
+    label: Autosave interval (minutes)
+    default: 15
+    min: 1
+    max: 120
+    advanced: true
+    bind: { env: AUTOSAVE_INTERVAL }
+  - key: mapNames
+    type: string
+    group: World
+    label: Map(s)
+    description: Semicolon-separated for multiple maps
+    default: "Muldraugh, KY"
+    advanced: true
+    bind: { env: MAP_NAMES }

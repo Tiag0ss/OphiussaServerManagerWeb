@@ -69,24 +69,48 @@ fields:
     label: Max players
     min: 1
     max: 40
-    default: 10
+    default: 40
     bind: { env: MAXUSERS, json: MaxConnectedUsers }
+  - key: maxAdmins
+    type: number
+    group: Server
+    label: Max connected admins
+    min: 1
+    max: 40
+    default: 4
+    advanced: true
+    bind: { env: HOST_SETTINGS_MaxConnectedAdmins }
+  - key: serverDescription
+    type: string
+    group: Server
+    label: Server description
+    default: ""
+    advanced: true
+    bind: { env: HOST_SETTINGS_Description }
+  - key: secure
+    type: boolean
+    group: Server
+    label: VAC protection
+    default: true
+    advanced: true
+    bind: { env: HOST_SETTINGS_Secure, trueFalse: true }
   - key: listOnSteam
     type: boolean
     group: Server
     label: List on Steam
-    default: true
+    default: false
     bind: { env: HOST_SETTINGS_ListOnSteam, trueFalse: true }
   - key: listOnEOS
     type: boolean
     group: Server
     label: List on EOS / crossplay browser
-    default: true
+    default: false
     bind: { env: HOST_SETTINGS_ListOnEOS, trueFalse: true }
   - key: useRcon
     type: boolean
     group: Server
     label: Enable RCON
+    description: "Kept on by default (image default is off) — the panel needs RCON for graceful save/stop and health checks"
     default: true
     bind: { json: Rcon.Enabled }
   - key: rconPassword
@@ -102,16 +126,51 @@ fields:
     group: Rules
     label: Game mode
     optionsFrom: gameMode
-    default: PvE
+    default: PvP
     bind: { env: GAME_SETTINGS_GameModeType }
+  - key: gameDifficulty
+    type: select
+    group: Rules
+    label: Boss difficulty
+    default: Normal
+    options:
+      - { value: Relaxed, label: Relaxed }
+      - { value: Normal, label: Normal }
+      - { value: Hard, label: Hard }
+    bind: { env: GAME_SETTINGS_GameDifficulty }
   - key: clanSize
     type: number
     group: Rules
     label: Clan size
     min: 1
-    max: 10
+    max: 50
     default: 4
     bind: { env: GAME_SETTINGS_ClanSize }
+  - key: playerDamageMode
+    type: select
+    group: Rules
+    label: PvP damage window
+    default: Always
+    advanced: true
+    showIf: { field: gameMode, equals: PvP }
+    options:
+      - { value: Always, label: Always }
+      - { value: TimeRestricted, label: Time restricted }
+    bind: { env: GAME_SETTINGS_PlayerDamageMode }
+  - key: pvpProtectionMode
+    type: select
+    group: Rules
+    label: New player PvP protection
+    default: Medium
+    advanced: true
+    showIf: { field: gameMode, equals: PvP }
+    options:
+      - { value: Disabled, label: Disabled }
+      - { value: VeryShort, label: Very short }
+      - { value: Short, label: Short }
+      - { value: Medium, label: Medium }
+      - { value: Long, label: Long }
+    bind: { env: GAME_SETTINGS_PvPProtectionMode }
   - key: dayDuration
     type: slider
     group: World
@@ -121,38 +180,57 @@ fields:
     step: 60
     default: 1080
     bind: { env: GAME_SETTINGS_DayDurationInSeconds }
-  - key: bloodBoundAmount
-    type: slider
+  - key: bloodBoundEquipment
+    type: boolean
     group: World
-    label: Blood-bound amount
-    min: 0
-    max: 10
-    step: 0.1
-    default: 1
+    label: Equipment is blood-bound (no drop/trade)
+    default: true
     advanced: true
-    bind: { env: GAME_SETTINGS_BloodBoundAmount }
+    bind: { env: GAME_SETTINGS_BloodBoundEquipment, trueFalse: true }
+  - key: castleDamageMode
+    type: select
+    group: Rules
+    label: Castle damage window
+    optionsFrom: castleHeartDamage
+    default: Never
+    advanced: true
+    showIf: { field: gameMode, equals: PvP }
+    bind: { env: GAME_SETTINGS_CastleDamageMode }
   - key: castleHeartDamageMode
     type: select
     group: Rules
-    label: Castle heart damage
-    optionsFrom: castleHeartDamage
-    default: Always
+    label: Castle heart destruction rule
+    default: CanBeDestroyedByPlayers
     advanced: true
+    options:
+      - { value: CanBeDestroyedOnlyWhenDecaying, label: Only when decaying }
+      - { value: CanBeDestroyedByPlayers, label: By players }
+      - { value: CanBeSeizedOrDestroyedByPlayers, label: Seized or destroyed by players }
     bind: { env: GAME_SETTINGS_CastleHeartDamageMode }
+  - key: castleDecayRateModifier
+    type: slider
+    group: Rates
+    label: Castle decay rate
+    min: 0
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_CastleDecayRateModifier }
   - key: teleportBoundItems
     type: boolean
     group: Rules
     label: Allow teleport with bound items
-    default: false
+    default: true
     advanced: true
     bind: { env: GAME_SETTINGS_TeleportBoundItems, trueFalse: true }
   - key: inventoryStacksModifier
     type: slider
     group: Rates
     label: Inventory stack size
-    min: 1
-    max: 5
-    step: 0.5
+    min: 0.25
+    max: 3
+    step: 0.25
     default: 1
     advanced: true
     bind: { env: GAME_SETTINGS_InventoryStacksModifier }
@@ -160,12 +238,22 @@ fields:
     type: slider
     group: Rates
     label: Drop table modifier
-    min: 0.5
-    max: 5
+    min: 0.25
+    max: 3
     step: 0.1
     default: 1
     advanced: true
     bind: { env: GAME_SETTINGS_DropTableModifier_General }
+  - key: craftRateModifier
+    type: slider
+    group: Rates
+    label: Crafting speed
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_CraftRateModifier }
   - key: materialYieldModifier
     type: slider
     group: Rates
@@ -206,6 +294,62 @@ fields:
     default: 1
     advanced: true
     bind: { env: GAME_SETTINGS_DurabilityModifier }
+  - key: vampireMaxHealthModifier
+    type: slider
+    group: Combat
+    label: Vampire max health
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: "GAME_SETTINGS_VampireStatModifiers__MaxHealthModifier" }
+  - key: vampirePhysicalPowerModifier
+    type: slider
+    group: Combat
+    label: Vampire physical power
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: "GAME_SETTINGS_VampireStatModifiers__PhysicalPowerModifier" }
+  - key: vampireSpellPowerModifier
+    type: slider
+    group: Combat
+    label: Vampire spell power
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: "GAME_SETTINGS_VampireStatModifiers__SpellPowerModifier" }
+  - key: bloodDrainModifier
+    type: slider
+    group: Survival
+    label: Blood drain rate
+    min: 0.1
+    max: 5
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { env: GAME_SETTINGS_BloodDrainModifier }
+  - key: compressSaveFiles
+    type: boolean
+    group: Maintenance
+    label: Compress save files
+    default: true
+    advanced: true
+    bind: { env: HOST_SETTINGS_CompressSaveFiles, trueFalse: true }
+  - key: resetDaysInterval
+    type: number
+    group: Maintenance
+    label: Auto-wipe interval (days, 0 = off)
+    min: 0
+    max: 365
+    default: 0
+    advanced: true
+    bind: { env: HOST_SETTINGS_ResetDaysInterval }
   - key: logDays
     type: number
     group: Maintenance

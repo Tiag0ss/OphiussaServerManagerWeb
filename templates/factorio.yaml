@@ -12,6 +12,9 @@ runtime:
     - { key: rcon, container: 27015, protocol: tcp }
   volumes:
     - { key: data, container: /factorio }
+  files:
+    - path: config/server-settings.json
+      format: json
   env:
     TZ: Europe/Lisbon
   backup:
@@ -43,6 +46,135 @@ fields:
     label: Update mods on start
     default: false
     bind: { env: UPDATE_MODS_ON_START, trueFalse: true }
+  - key: preset
+    type: select
+    group: Server
+    label: Map generation preset
+    default: ""
+    showIf: { field: generateNewSave, equals: true }
+    options:
+      - { value: "", label: Default (use map settings) }
+      - { value: rich-resources, label: Rich resources }
+      - { value: marathon, label: Marathon }
+      - { value: death-world, label: Death world }
+      - { value: death-world-marathon, label: Death world marathon }
+      - { value: rail-world, label: Rail world }
+      - { value: ribbon-world, label: Ribbon world }
+    bind: { env: PRESET }
+  - key: dlcSpaceAge
+    type: boolean
+    group: Server
+    label: Enable Space Age DLC mods
+    default: true
+    advanced: true
+    bind: { env: DLC_SPACE_AGE, trueFalse: true }
+  - key: maxPlayers
+    type: number
+    group: Server
+    label: Max players (0 = unlimited)
+    default: 0
+    min: 0
+    max: 255
+    bind: { json: "max_players" }
+  - key: visibilityPublic
+    type: boolean
+    group: Server
+    label: Publish to Factorio matchmaking
+    default: true
+    bind: { json: "visibility.public" }
+  - key: visibilityLan
+    type: boolean
+    group: Server
+    label: Broadcast on LAN
+    default: true
+    advanced: true
+    bind: { json: "visibility.lan" }
+  - key: autoPause
+    type: boolean
+    group: Server
+    label: Pause when empty
+    default: true
+    advanced: true
+    bind: { json: "auto_pause" }
+  - key: autoPauseWhenPlayersConnect
+    type: boolean
+    group: Server
+    label: Pause while a player is connecting
+    default: false
+    advanced: true
+    bind: { json: "auto_pause_when_players_connect" }
+  - key: gamePassword
+    type: string
+    group: Access
+    label: Game password
+    secret: true
+    default: ""
+    bind: { json: "game_password" }
+  - key: requireUserVerification
+    type: boolean
+    group: Access
+    label: Require verified Factorio.com accounts
+    default: true
+    advanced: true
+    bind: { json: "require_user_verification" }
+  - key: allowCommands
+    type: select
+    group: Rules
+    label: Allow console commands
+    default: admins-only
+    options:
+      - { value: "true", label: Everyone }
+      - { value: "false", label: Nobody }
+      - { value: admins-only, label: Admins only }
+    bind: { json: "allow_commands" }
+  - key: onlyAdminsCanPause
+    type: boolean
+    group: Rules
+    label: Only admins can pause
+    default: true
+    advanced: true
+    bind: { json: "only_admins_can_pause_the_game" }
+  - key: ignorePlayerLimitForReturningPlayers
+    type: boolean
+    group: Rules
+    label: Let returning players bypass max players
+    default: false
+    advanced: true
+    bind: { json: "ignore_player_limit_for_returning_players" }
+  - key: afkAutokickInterval
+    type: number
+    group: Rules
+    label: AFK autokick (minutes, 0 = off)
+    default: 0
+    min: 0
+    max: 120
+    advanced: true
+    bind: { json: "afk_autokick_interval" }
+  - key: autosaveInterval
+    type: number
+    group: Maintenance
+    label: Autosave interval (minutes)
+    default: 10
+    min: 1
+    max: 120
+    bind: { json: "autosave_interval" }
+  - key: autosaveSlots
+    type: number
+    group: Maintenance
+    label: Autosave slot count
+    default: 5
+    min: 1
+    max: 50
+    advanced: true
+    bind: { json: "autosave_slots" }
+  - key: updateIgnore
+    type: list
+    group: Maintenance
+    label: Mods to skip on auto-update
+    item: { type: string, placeholder: "mod-name" }
+    default: []
+    advanced: true
+    bind: { env: UPDATE_IGNORE, join: "," }
   - key: username
     type: string
     group: Factorio.com

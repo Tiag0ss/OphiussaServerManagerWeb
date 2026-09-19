@@ -24,6 +24,15 @@ export type FieldBind = {
   ifTrue?: string;
   /** Format booleans as "true"/"false" instead of "1"/"0" (Docker images). */
   trueFalse?: boolean;
+  /**
+   * Compose this field into `env` as an ARK-style query-string fragment
+   * (`?queryParam=value`) instead of setting `env` directly — for images
+   * (e.g. ARK Survival Ascended) whose launch command only accepts a single
+   * combined settings string, with no per-setting env vars of their own.
+   */
+  queryParam?: string;
+  /** Append directly onto an existing `env` value with no separator (vs. the default space-joined append). */
+  rawAppend?: boolean;
 };
 
 export type ShowIf = {

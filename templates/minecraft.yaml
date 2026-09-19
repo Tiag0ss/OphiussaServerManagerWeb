@@ -158,3 +158,203 @@ fields:
     label: Enable whitelist
     default: false
     bind: { env: ENABLE_WHITELIST, trueFalse: true }
+  - key: whitelistedPlayers
+    type: list
+    group: Access
+    label: Whitelisted players (username or UUID)
+    item: { type: string, placeholder: "Notch" }
+    default: []
+    showIf: { field: whitelist, equals: true }
+    bind: { env: WHITELIST, join: "," }
+  - key: enforceWhitelist
+    type: boolean
+    group: Access
+    label: Enforce whitelist immediately
+    default: false
+    advanced: true
+    showIf: { field: whitelist, equals: true }
+    bind: { env: ENFORCE_WHITELIST, trueFalse: true }
+  - key: playerIdleTimeout
+    type: number
+    group: Access
+    label: Kick idle players after (minutes, 0 = off)
+    default: 0
+    min: 0
+    max: 120
+    advanced: true
+    bind: { env: PLAYER_IDLE_TIMEOUT }
+  - key: opPermissionLevel
+    type: number
+    group: Access
+    label: Operator permission level
+    default: 4
+    min: 1
+    max: 4
+    advanced: true
+    bind: { env: OP_PERMISSION_LEVEL }
+  - key: memory
+    type: string
+    group: Server
+    label: JVM memory (heap)
+    description: "e.g. 4G. The image defaults to only 1G regardless of the container's RAM limit above unless set here."
+    default: 4G
+    bind: { env: MEMORY }
+  - key: icon
+    type: string
+    group: Server
+    label: Server icon (URL or path)
+    default: ""
+    advanced: true
+    bind: { env: ICON }
+  - key: overrideIcon
+    type: boolean
+    group: Server
+    label: Overwrite existing server icon
+    default: false
+    advanced: true
+    bind: { env: OVERRIDE_ICON, trueFalse: true }
+  - key: resourcePack
+    type: string
+    group: Server
+    label: Resource pack URL
+    default: ""
+    advanced: true
+    bind: { env: RESOURCE_PACK }
+  - key: resourcePackSha1
+    type: string
+    group: Server
+    label: Resource pack SHA1
+    default: ""
+    advanced: true
+    bind: { env: RESOURCE_PACK_SHA1 }
+  - key: resourcePackEnforce
+    type: boolean
+    group: Server
+    label: Force resource pack on clients
+    default: false
+    advanced: true
+    bind: { env: RESOURCE_PACK_ENFORCE, trueFalse: true }
+  - key: enableQuery
+    type: boolean
+    group: Server
+    label: Enable GameSpy query protocol
+    default: false
+    advanced: true
+    bind: { env: ENABLE_QUERY, trueFalse: true }
+  - key: queryPort
+    type: number
+    group: Server
+    label: Query port (UDP)
+    default: 25565
+    advanced: true
+    showIf: { field: enableQuery, equals: true }
+    bind: { env: QUERY_PORT }
+  - key: rateLimit
+    type: number
+    group: Server
+    label: Packet rate limit per player (0 = off)
+    default: 0
+    min: 0
+    advanced: true
+    bind: { env: RATE_LIMIT }
+  - key: levelType
+    type: select
+    group: World
+    label: World type
+    default: normal
+    options:
+      - { value: normal, label: Normal }
+      - { value: flat, label: Superflat }
+      - { value: large_biomes, label: Large biomes }
+      - { value: amplified, label: Amplified }
+      - { value: single_biome_surface, label: Single biome }
+    bind: { env: LEVEL_TYPE }
+  - key: generateStructures
+    type: boolean
+    group: World
+    label: Generate structures (villages, temples, etc.)
+    default: true
+    advanced: true
+    bind: { env: GENERATE_STRUCTURES, trueFalse: true }
+  - key: allowNether
+    type: boolean
+    group: World
+    label: Allow the Nether
+    description: On MC 1.21.9+ this property was replaced by a gamerule and this env var has no effect
+    default: true
+    advanced: true
+    bind: { env: ALLOW_NETHER, trueFalse: true }
+  - key: maxWorldSize
+    type: number
+    group: World
+    label: Max world size (radius, blocks)
+    default: 29999984
+    advanced: true
+    bind: { env: MAX_WORLD_SIZE }
+  - key: hardcore
+    type: boolean
+    group: Gameplay
+    label: Hardcore mode
+    default: false
+    bind: { env: HARDCORE, trueFalse: true }
+  - key: simulationDistance
+    type: number
+    group: Gameplay
+    label: Simulation distance
+    default: 10
+    min: 3
+    max: 32
+    advanced: true
+    bind: { env: SIMULATION_DISTANCE }
+  - key: allowFlight
+    type: boolean
+    group: Gameplay
+    label: Allow flight
+    default: false
+    advanced: true
+    bind: { env: ALLOW_FLIGHT, trueFalse: true }
+  - key: spawnProtection
+    type: number
+    group: Gameplay
+    label: Spawn protection radius
+    default: 16
+    min: 0
+    advanced: true
+    bind: { env: SPAWN_PROTECTION }
+  - key: spawnAnimals
+    type: boolean
+    group: Gameplay
+    label: Spawn animals
+    default: true
+    advanced: true
+    bind: { env: SPAWN_ANIMALS, trueFalse: true }
+  - key: spawnNpcs
+    type: boolean
+    group: Gameplay
+    label: Spawn villagers
+    default: true
+    advanced: true
+    bind: { env: SPAWN_NPCS, trueFalse: true }
+  - key: spawnMonsters
+    type: boolean
+    group: Gameplay
+    label: Spawn monsters
+    description: On MC 1.21.9+ this property was replaced by a gamerule and this env var has no effect
+    default: true
+    advanced: true
+    bind: { env: SPAWN_MONSTERS, trueFalse: true }
+  - key: enableCommandBlock
+    type: boolean
+    group: Gameplay
+    label: Enable command blocks
+    description: On MC 1.21.9+ this property was replaced by a gamerule and this env var has no effect
+    default: false
+    advanced: true
+    bind: { env: ENABLE_COMMAND_BLOCK, trueFalse: true }
+  - key: forceGamemode
+    type: boolean
+    group: Gameplay
+    label: Force default game mode on join
+    default: false
+    advanced: true
+    bind: { env: FORCE_GAMEMODE, trueFalse: true }

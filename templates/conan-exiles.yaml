@@ -14,6 +14,9 @@ runtime:
     - { key: rcon, container: 25575, protocol: tcp, listenEnv: RCON_PORT, matchHost: true }
   volumes:
     - { key: data, container: /home/steam/server-files }
+  files:
+    - path: ConanSandbox/Saved/Config/LinuxServer/ServerSettings.ini
+      format: ini
   env:
     TZ: Europe/Lisbon
   backup:
@@ -82,3 +85,179 @@ fields:
     default: true
     advanced: true
     bind: { env: UPDATE_ON_START, trueFalse: true }
+  - key: pvpEnabled
+    type: boolean
+    group: Rules
+    label: PvP enabled
+    default: false
+    bind: { ini: "ServerSettings.PVPEnabled" }
+  - key: combatModeModifier
+    type: boolean
+    group: Rules
+    label: PvE-Conflict mode
+    description: Allows temporary PvP windows on an otherwise PvE server
+    default: false
+    advanced: true
+    showIf: { field: pvpEnabled, equals: true }
+    bind: { ini: "ServerSettings.CombatModeModifier" }
+  - key: canDamagePlayerOwnedStructures
+    type: boolean
+    group: Rules
+    label: Allow damaging player structures
+    default: false
+    advanced: true
+    showIf: { field: pvpEnabled, equals: true }
+    bind: { ini: "ServerSettings.CanDamagePlayerOwnedStructures" }
+  - key: clanMaxSize
+    type: number
+    group: Server
+    label: Max clan size
+    min: 1
+    max: 100
+    default: 30
+    advanced: true
+    bind: { ini: "ServerSettings.ClanMaxSize" }
+  - key: harvestAmountMultiplier
+    type: slider
+    group: Harvesting
+    label: Harvest amount
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    bind: { ini: "ServerSettings.HarvestAmountMultiplier" }
+  - key: resourceRespawnSpeedMultiplier
+    type: slider
+    group: Harvesting
+    label: Resource respawn speed
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.ResourceRespawnSpeedMultiplier" }
+  - key: playerXPRateMultiplier
+    type: slider
+    group: Rules
+    label: XP rate (overall)
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    bind: { ini: "ServerSettings.PlayerXPRateMultiplier" }
+  - key: playerXPTimeMultiplier
+    type: slider
+    group: Rules
+    label: XP rate (survival time)
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerXPTimeMultiplier" }
+  - key: playerXPKillMultiplier
+    type: slider
+    group: Rules
+    label: XP rate (kills)
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerXPKillMultiplier" }
+  - key: playerXPHarvestMultiplier
+    type: slider
+    group: Rules
+    label: XP rate (harvesting)
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerXPHarvestMultiplier" }
+  - key: playerXPCraftMultiplier
+    type: slider
+    group: Rules
+    label: XP rate (crafting)
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.PlayerXPCraftMultiplier" }
+  - key: dayCycleSpeedScale
+    type: slider
+    group: Rules
+    label: Day/night cycle speed
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.DayCycleSpeedScale" }
+  - key: dayTimeSpeedScale
+    type: slider
+    group: Rules
+    label: Day time speed
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.DayTimeSpeedScale" }
+  - key: nightTimeSpeedScale
+    type: slider
+    group: Rules
+    label: Night time speed
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.NightTimeSpeedScale" }
+  - key: dawnDuskSpeedScale
+    type: slider
+    group: Rules
+    label: Dawn/dusk speed
+    min: 0.1
+    max: 10
+    step: 0.1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.DawnDuskSpeedScale" }
+  - key: maxNudity
+    type: select
+    group: Server
+    label: Max nudity
+    default: Full
+    advanced: true
+    options:
+      - { value: None, label: None }
+      - { value: Partial, label: Partial }
+      - { value: Full, label: Full }
+    bind: { ini: "ServerSettings.MaxNudity" }
+  - key: serverVoiceChat
+    type: select
+    group: Server
+    label: Voice chat
+    default: Enabled
+    advanced: true
+    options:
+      - { value: Enabled, label: Enabled }
+      - { value: Disabled, label: Disabled }
+    bind: { ini: "ServerSettings.ServerVoiceChat" }
+  - key: enableWhitelist
+    type: boolean
+    group: Access
+    label: Whitelist only
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.EnableWhitelist" }
+  - key: regionBlockList
+    type: string
+    group: Access
+    label: Blocked country codes
+    description: Comma-separated ISO country codes
+    default: ""
+    advanced: true
+    bind: { ini: "ServerSettings.RegionBlockList" }

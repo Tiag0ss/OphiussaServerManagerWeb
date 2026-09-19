@@ -63,7 +63,7 @@ fields:
     label: Max players
     min: 1
     max: 10
-    default: 8
+    default: 10
     bind: { env: MAX_PLAYERS }
   - key: password
     type: string
@@ -89,6 +89,62 @@ fields:
     default: ""
     advanced: true
     bind: { env: SEASON }
+  - key: worldIndex
+    type: number
+    group: World
+    label: World save slot index
+    default: 0
+    min: 0
+    advanced: true
+    bind: { env: WORLD_INDEX }
+  - key: hashedWorldSeed
+    type: string
+    group: World
+    label: Hashed world seed
+    description: Alternate seed input, only used when the world is first created
+    default: ""
+    advanced: true
+    bind: { env: HASHED_WORLD_SEED }
+  - key: activateAllContent
+    type: boolean
+    group: World
+    label: Activate all post-launch content bundles
+    description: For worlds created before v1.1. Cannot be undone once enabled.
+    default: false
+    advanced: true
+    bind: { env: ACTIVATE_ALL_CONTENT, trueFalse: true }
+  - key: activateContent
+    type: list
+    group: World
+    label: Activate specific content bundles
+    description: "For worlds created before v1.1. Valid values: GiantCicadaBossDungeon, NatureBiomeCicadas, GuaranteedOases, BiomeStatues, AbioticFactor. Cannot be undone once enabled."
+    item: { type: string, placeholder: GiantCicadaBossDungeon }
+    default: []
+    advanced: true
+    showIf: { field: activateAllContent, equals: false }
+    bind: { env: ACTIVATE_CONTENT, join: "," }
+  - key: allowOnlyPlatform
+    type: select
+    group: Access
+    label: Restrict Direct Connect to platform
+    description: Only affects Direct Connect joins
+    default: ""
+    advanced: true
+    options:
+      - { value: "", label: All platforms }
+      - { value: "1", label: Steam }
+      - { value: "2", label: Epic }
+      - { value: "3", label: Microsoft }
+      - { value: "4", label: GOG }
+    bind: { env: ALLOW_ONLY_PLATFORM }
+  - key: serverIp
+    type: string
+    group: Server
+    label: Bind address
+    description: Direct Connect listen address. Empty = 0.0.0.0 (any)
+    default: ""
+    advanced: true
+    bind: { env: SERVER_IP }
   - key: discordWebhook
     type: string
     group: Hooks
@@ -96,6 +152,38 @@ fields:
     advanced: true
     default: ""
     bind: { env: DISCORD_WEBHOOK_URL }
+  - key: discordPlayerJoinEnabled
+    type: boolean
+    group: Hooks
+    label: Notify on player join
+    default: true
+    advanced: true
+    showIf: { field: discordWebhook, notEquals: "" }
+    bind: { env: DISCORD_PLAYER_JOIN_ENABLED, trueFalse: true }
+  - key: discordPlayerLeaveEnabled
+    type: boolean
+    group: Hooks
+    label: Notify on player leave
+    default: true
+    advanced: true
+    showIf: { field: discordWebhook, notEquals: "" }
+    bind: { env: DISCORD_PLAYER_LEAVE_ENABLED, trueFalse: true }
+  - key: discordServerStartEnabled
+    type: boolean
+    group: Hooks
+    label: Notify on server start
+    default: true
+    advanced: true
+    showIf: { field: discordWebhook, notEquals: "" }
+    bind: { env: DISCORD_SERVER_START_ENABLED, trueFalse: true }
+  - key: discordServerStopEnabled
+    type: boolean
+    group: Hooks
+    label: Notify on server stop
+    default: true
+    advanced: true
+    showIf: { field: discordWebhook, notEquals: "" }
+    bind: { env: DISCORD_SERVER_STOP_ENABLED, trueFalse: true }
   - key: modsEnabled
     type: boolean
     group: Mods

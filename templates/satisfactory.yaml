@@ -75,3 +75,57 @@ fields:
     default: false
     advanced: true
     bind: { env: STEAMBETA, trueFalse: true }
+  - key: maxObjects
+    type: number
+    group: Server
+    label: Object limit
+    default: 2162688
+    advanced: true
+    bind: { env: MAXOBJECTS }
+  - key: timeout
+    type: number
+    group: Server
+    label: Client timeout (seconds)
+    min: 5
+    max: 300
+    default: 30
+    advanced: true
+    bind: { env: TIMEOUT }
+  - key: multihome
+    type: string
+    group: Server
+    label: Listen interface
+    description: Usually not needed
+    default: "::"
+    advanced: true
+    bind: { env: MULTIHOME }
+  - key: steamBetaId
+    type: string
+    group: Maintenance
+    label: Custom beta branch ID
+    default: ""
+    advanced: true
+    bind: { env: STEAMBETAID }
+  - key: steamBetaKey
+    type: string
+    group: Maintenance
+    label: Beta branch password
+    secret: true
+    default: ""
+    advanced: true
+    showIf: { field: steamBetaId, notEquals: "" }
+    bind: { env: STEAMBETAKEY }
+  - key: keepFullLogs
+    type: boolean
+    group: Maintenance
+    label: Keep full logs (disable log pruning)
+    default: false
+    advanced: true
+    bind: { env: LOG, trueFalse: true }
+  - key: debug
+    type: boolean
+    group: Maintenance
+    label: Debug mode
+    default: false
+    advanced: true
+    bind: { env: DEBUG, trueFalse: true }

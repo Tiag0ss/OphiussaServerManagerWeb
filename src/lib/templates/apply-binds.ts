@@ -138,13 +138,24 @@ function applyFieldBind(
     return;
   }
 
+  // ARK-style "?Key=Value" query-string fragment, composed into a single
+  // shared env var (e.g. EXTRA_SETTINGS) rather than its own env var.
+  if (field.bind.queryParam && field.bind.env) {
+    const queryValue =
+      typeof value === "boolean" ? (value ? "True" : "False") : formatValue(value);
+    env[field.bind.env] = `${env[field.bind.env] || ""}?${field.bind.queryParam}=${queryValue}`;
+    return;
+  }
+
   const formatted = formatValue(value, field.bind.join, field.bind.trueFalse);
   const withPrefix = field.bind.prefix
     ? `${field.bind.prefix}${formatted}`
     : formatted;
 
   if (field.bind.env) {
-    if (field.bind.prefix || env[field.bind.env]) {
+    if (field.bind.rawAppend) {
+      env[field.bind.env] = `${env[field.bind.env] || ""}${withPrefix}`;
+    } else if (field.bind.prefix || env[field.bind.env]) {
       appendEnv(env, field.bind.env, withPrefix);
     } else {
       env[field.bind.env] = withPrefix;

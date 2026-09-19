@@ -148,7 +148,7 @@ fields:
     type: boolean
     group: Rules
     label: Allow flyer carry (PvE)
-    default: true
+    default: false
     advanced: true
     bind: { ini: "ServerSettings.AllowFlyerCarryPvE" }
   - key: harvestHealth
@@ -295,7 +295,7 @@ fields:
     type: boolean
     group: Rules
     label: PvE mode
-    default: true
+    default: false
     bind: { ini: "ServerSettings.ServerPVE" }
   - key: allowCaveBuildingPvE
     type: boolean
@@ -308,7 +308,7 @@ fields:
     type: boolean
     group: Rules
     label: Always allow structure pickup
-    default: true
+    default: false
     advanced: true
     bind: { ini: "ServerSettings.AlwaysAllowStructurePickup" }
   - key: structureResistance
@@ -324,7 +324,7 @@ fields:
   - key: raidDinoAvailability
     type: slider
     group: Dinos
-    label: Raid dino availability
+    label: Raid dino (Titan) food drain
     min: 0
     max: 1
     step: 0.1
@@ -379,6 +379,130 @@ fields:
       fields:
         - { key: class, type: select, label: Dino, optionsFrom: dinos }
         - { key: weight, type: slider, label: Weight, min: 0, max: 10, step: 0.1, default: 1 }
+  - key: overrideOfficialDifficulty
+    type: slider
+    group: Rules
+    label: Max difficulty (wild dino level cap)
+    description: "5 = level 150 wild dinos (common non-official default). Overrides the plain Difficulty offset above."
+    min: 1
+    max: 10
+    step: 0.5
+    default: 5
+    bind: { ini: "/script/shootergame.shootergamemode.OverrideOfficialDifficulty" }
+  - key: serverHardcore
+    type: boolean
+    group: Rules
+    label: Hardcore mode
+    description: Characters are deleted on death
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.ServerHardcore" }
+  - key: preventOfflinePvP
+    type: boolean
+    group: Rules
+    label: Prevent offline PvP
+    description: Protects offline players' structures/dinos from raiding (off by default in vanilla ARK)
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.PreventOfflinePvP" }
+  - key: preventOfflinePvPInterval
+    type: number
+    group: Rules
+    label: Offline PvP grace period (seconds)
+    min: 0
+    max: 3600
+    default: 300
+    advanced: true
+    showIf: { field: preventOfflinePvP, equals: true }
+    bind: { ini: "ServerSettings.PreventOfflinePvPInterval" }
+  - key: disableStructureDecayPvE
+    type: boolean
+    group: Rules
+    label: Disable structure decay (PvE)
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.DisableStructureDecayPvE" }
+  - key: itemStackSizeMultiplier
+    type: slider
+    group: Harvesting
+    label: Item stack size multiplier
+    min: 1
+    max: 100
+    step: 1
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.ItemStackSizeMultiplier" }
+  - key: supplyCrateLootQuality
+    type: slider
+    group: Harvesting
+    label: Supply crate loot quality
+    min: 1
+    max: 10
+    step: 0.5
+    default: 1
+    advanced: true
+    bind: { ini: "ServerSettings.SupplyCrateLootQualityMultiplier" }
+  - key: noTributeDownloads
+    type: boolean
+    group: Rules
+    label: Disable Obelisk/cross-ARK transfers
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.NoTributeDownloads" }
+  - key: globalVoiceChat
+    type: boolean
+    group: Rules
+    label: Global voice chat
+    default: true
+    advanced: true
+    bind: { ini: "ServerSettings.GlobalVoiceChat" }
+  - key: proximityChat
+    type: boolean
+    group: Rules
+    label: Proximity chat
+    default: true
+    advanced: true
+    bind: { ini: "ServerSettings.ProximityChat" }
+  - key: serverCrosshair
+    type: boolean
+    group: Rules
+    label: Show crosshair
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.ServerCrosshair" }
+  - key: kickIdlePlayersPeriod
+    type: number
+    group: Server
+    label: Kick idle players after (seconds)
+    description: 0 disables idle kicking
+    min: 0
+    max: 86400
+    default: 3600
+    advanced: true
+    bind: { ini: "ServerSettings.KickIdlePlayersPeriod" }
+  - key: allowUnlimitedRespecs
+    type: boolean
+    group: Player
+    label: Allow unlimited mindwipes (respecs)
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.AllowUnlimitedRespecs" }
+  - key: maxPersonalTamedDinos
+    type: number
+    group: Dinos
+    label: Max tamed dinos per player (-1 = unlimited)
+    min: -1
+    max: 500
+    default: 40
+    advanced: true
+    bind: { ini: "ServerSettings.MaxPersonalTamedDinos" }
+  - key: autoDestroyDecayedDinos
+    type: boolean
+    group: Dinos
+    label: Auto-destroy decayed wild-tamed dinos
+    default: false
+    advanced: true
+    bind: { ini: "ServerSettings.AutoDestroyDecayedDinos" }
   - key: additionalArgs
     type: text
     group: Server
