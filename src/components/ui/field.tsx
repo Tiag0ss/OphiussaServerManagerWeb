@@ -63,12 +63,15 @@ export function Select({
 export function Card({
   children,
   className,
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
     <div
+      id={id}
       className={cn(
         "rounded-xl border border-border bg-card/90 p-5 shadow-sm backdrop-blur",
         className,

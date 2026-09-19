@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  BookOpen,
   FileStack,
   LayoutDashboard,
   LogOut,
@@ -26,6 +27,7 @@ const adminLinks = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/audit", label: "Audit log", icon: ScrollText },
+  { href: "/docs", label: "Docs", icon: BookOpen },
 ] as const;
 
 function isPathActive(pathname: string, href: string): boolean {
